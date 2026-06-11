@@ -13,7 +13,7 @@ export class ZodValidationPipe<T> implements PipeTransform<unknown, T> {
   transform(value: unknown): T {
     const result = this.schema.safeParse(value);
     if (!result.success) {
-      throw new AppException('VALIDATION_ERROR', 'Некорректные данные запроса', 400, {
+      throw new AppException('VALIDATION_ERROR', 'Некорректные данные запроса', 422, {
         issues: result.error.issues.map((i) => ({
           path: i.path.join('.'),
           message: i.message,

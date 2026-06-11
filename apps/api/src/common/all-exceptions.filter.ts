@@ -13,6 +13,7 @@ import { AppException } from './app.exception';
 
 const STATUS_TO_CODE: Record<number, ErrorCode> = {
   400: 'VALIDATION_ERROR',
+  422: 'VALIDATION_ERROR',
   401: 'UNAUTHORIZED',
   402: 'LIMIT_EXCEEDED',
   403: 'FORBIDDEN',
