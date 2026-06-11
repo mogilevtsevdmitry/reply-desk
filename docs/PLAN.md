@@ -1,0 +1,79 @@
+# ReplyDesk — единый план выполнения
+
+Сводный план поверх пакета ТЗ (00–05). Источник истины по продукту — 00-OVERVIEW.md,
+по решениям — DECISIONS.md (ADR-001…005). Исполнение — конвейером агентов с паузой
+на ревью после каждого этапа.
+
+## Принятые решения (кратко)
+
+| # | Решение | ADR |
+|---|---|---|
+| 1 | Anthropic API — единственный AI-сервис; похожие отзывы через pg_trgm + подтверждение LLM, embeddings/pgvector удалены | ADR-001 |
+| 2 | Лимиты: атомарное резервирование при POST, декремент-компенсация при FAILED | ADR-002 |
+| 3 | Ретрай FAILED-генерации: POST /reviews/:id/retry (лимит резервируется заново) | ADR-003 |
+| 4 | SSE: fetch-based поток с заголовком Authorization, токен в query запрещён | ADR-004 |
+| 5 | POST /company возвращает новый accessToken с companyId | ADR-005 |
+
+## Этапы
+
+### Этап 0 — подготовка (выполняется сейчас)
+- [x] Ревизия пакета ТЗ, устранение противоречий (правки внесены в 00–05)
+- [x] DECISIONS.md с ADR-001…005
+- [ ] git init, начальный коммит пакета ТЗ
+- **Гейт:** Дмитрий подтверждает правки ТЗ и план
+
+### Этап 1 — Дизайнер (01-DESIGN.md)
+Вход: 01-DESIGN.md. Выход: `docs/design/` — tokens.css, ui-kit.html, 5 HTML-прототипов
+(auth, onboarding, generate с тремя состояниями, history, settings), MOTION.md, NOTES.md.
+- Ключевой риск: «дефолтный AI-дашборд» — критерий самокритики в ТЗ
+- **Гейт:** прототипы открываются в браузере, ревью Дмитрия (визуал — субъективен)
+
+### Этап 2 — Разработчик (02-DEVELOPER.md + docs/design/)
+Выход: монорепо (apps/web, apps/api, packages/contracts, packages/config, prompts/),
+миграции с pg_trgm, seed (включая 3 текстово похожих отзыва), юнит-тесты минимума.
+Порядок внутри этапа:
+1. Скелет монорепо + packages/config + packages/contracts (zod-схемы DTO)
+2. Prisma-схема, миграции (pg_trgm + GIN-индекс), seed
+3. AuthModule (JWT, refresh-ротация) → CompanyModule (перевыпуск токена) → UsageModule
+   (резервирование) → ReviewsModule (+retry) → LlmModule → GenerationModule (worker, SSE)
+4. Промпты: base, platforms, fake-detection, 7 нишевых файлов (русский, содержательные)
+5. Frontend: auth → onboarding → главный экран (SSE, анимация по MOTION.md) → history →
+   settings
+- **Гейт:** happy path руками + юнит-тесты зелёные, ревью Дмитрия
+
+### Этап 3 — Тестировщик (03-QA.md)
+Выход: Jest+Supertest+Testcontainers (API), Playwright (E2E), `docs/qa/BUGS.md`,
+`docs/qa/REPORT.md`. LLM всегда мокается (FakeLlmProvider: валидный/невалидный JSON,
+таймаут, сетевая ошибка). Вся матрица из 03-QA.md, включая новые кейсы:
+компенсация лимита при FAILED, retry-флоу, изоляция similarReviewIds по тенанту.
+- **Гейт:** blocker/major багов нет или исправлены разработчиком; вердикт в REPORT.md
+
+### Этап 4 — Безопасник (04-SECURITY.md)
+Выход: `docs/security/AUDIT.md` (находки с severity, прогон prompt-injection проб),
+атомарные коммиты фиксов critical/high.
+- Главный фокус: изоляция тенантов построчно (companyId из JWT везде), IDOR-прогон,
+  SSE-проверка до подписки, валидация similarReviewIds
+- **Гейт:** critical/high исправлены, QA-тесты после фиксов зелёные
+
+### Этап 5 — DevOps (05-DEVOPS.md)
+Выход: 3 Dockerfile (api, worker, web; < 300MB для web/api), compose + compose.dev,
+CI (lint → test → e2e → build → audit), `docs/devops/DEPLOY.md` (Dokploy/Traefik),
+`docs/devops/RUNBOOK.md`. Postgres — `postgres:16-alpine`.
+- **Гейт = DoD проекта:** чистый клон → `cp .env.example .env` + LLM-ключ →
+  `docker compose up` → полный happy path; CI зелёный
+
+## Сквозные правила
+
+- Каждый агент: если ТЗ молчит — простейшее решение + запись в DECISIONS.md (ADR).
+- Scope не расширять; «НЕ ВХОДИТ» из OVERVIEW — закон.
+- Интерактивные шаги (ввод ключей, ручные проверки UI) — наружу как «требуется
+  вмешательство», не внутрь субагентов.
+- Известный продуктовый риск: 152-ФЗ / трансграничная передача текстов отзывов —
+  принят для MVP (см. DECISIONS, «мелочи»).
+
+## Порядок запуска
+
+Этапы строго последовательны (артефакт каждого — вход следующего). Внутри этапа 2
+допускается параллель: промпты и frontend-страницы независимы после готовности
+contracts и API. Исполнение — субагентами по ТЗ соответствующего этапа, с паузой
+на ревью между этапами.
