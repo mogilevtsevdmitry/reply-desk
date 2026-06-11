@@ -6,3 +6,205 @@ body {
   color: var(--color-ink);
   font-family: var(--font-text);
 }
+
+/* Видимый focus-ring везде (tokens.css: --focus-ring) */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Инпуты: focus совмещает ring и подсветку рамки (как в прототипах) */
+.rd-input:focus-visible,
+.rd-textarea:focus-visible,
+.rd-select:focus-visible {
+  outline-offset: 1px;
+  border-color: var(--color-accent);
+}
+
+.rd-date {
+  color-scheme: dark;
+}
+
+/* ============ Пайплайн генерации (signature, MOTION.md) ============ */
+
+.rail {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  margin: 0 8px 16px;
+}
+.rail::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 13px;
+  height: 2px;
+  background: var(--color-line);
+  border-radius: 1px;
+}
+.rail-fill {
+  position: absolute;
+  left: 14px;
+  top: 13px;
+  height: 2px;
+  width: 0;
+  max-width: calc(100% - 28px);
+  background: var(--color-accent);
+  border-radius: 1px;
+  /* Луч дотягивается до узла за 1800 мс ЛИНЕЙНО (равномерная работа) */
+  transition: width 1800ms linear;
+}
+.rail-fill.is-frozen {
+  /* FAILED: луч замирает на достигнутой позиции */
+  transition: none;
+}
+.pl-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 28px;
+}
+.pl-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--color-bg);
+  border: 2px solid var(--color-line-strong);
+  transition:
+    border-color 240ms var(--ease-out-rd),
+    box-shadow 240ms var(--ease-out-rd);
+}
+.pl-dot::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-line-strong);
+  transition: background 240ms var(--ease-out-rd);
+}
+.pl-node.is-active .pl-dot {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-glow-accent);
+}
+.pl-node.is-active .pl-dot::after {
+  background: var(--color-accent);
+  animation: rd-pulse 1200ms var(--ease-in-out-rd) infinite;
+}
+.pl-node.is-done .pl-dot {
+  border-color: var(--color-accent);
+}
+.pl-node.is-done .pl-dot::after {
+  background: var(--color-accent);
+}
+.pl-node.is-failed .pl-dot {
+  border-color: var(--color-danger);
+  box-shadow:
+    0 0 0 1px rgba(214, 58, 49, 0.35),
+    0 0 24px rgba(214, 58, 49, 0.18);
+}
+.pl-node.is-failed .pl-dot::after {
+  background: var(--color-danger);
+}
+@keyframes rd-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.6;
+  }
+}
+.pl-name {
+  font-size: var(--text-13);
+  color: var(--color-ink-faint);
+  white-space: nowrap;
+  transition: color 240ms var(--ease-out-rd);
+}
+.pl-node.is-active .pl-name,
+.pl-node.is-done .pl-name {
+  color: var(--color-ink);
+}
+.pl-node.is-failed .pl-name {
+  color: var(--color-danger);
+}
+
+/* Появление блока ошибки пайплайна — 240 мс */
+.pl-error-enter {
+  animation: rd-rise 240ms var(--ease-out-rd);
+}
+
+/* ============ Карточки результата: стаггер (MOTION.md) ============ */
+
+.result-card {
+  opacity: 0;
+  transform: translateY(14px);
+}
+.result-card.is-in {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 480ms var(--ease-out-rd),
+    transform 480ms var(--ease-out-rd);
+}
+
+/* ============ Шаги онбординга: подъём 8px + fade 240 мс ============ */
+
+.step-enter {
+  animation: rd-rise 240ms var(--ease-out-rd);
+}
+@keyframes rd-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ============ Тост: подъём 8px + fade 240 мс ============ */
+
+.rd-toast {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
+  pointer-events: none;
+  transition:
+    opacity 240ms var(--ease-out-rd),
+    transform 240ms var(--ease-out-rd);
+}
+.rd-toast.is-show {
+  opacity: 1;
+  transform: translateX(-50%);
+}
+
+/* ============ prefers-reduced-motion: статичная версия (MOTION.md) ============ */
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-fill {
+    transition: none; /* заполнение меняется дискретно */
+  }
+  .pl-node.is-active .pl-dot::after {
+    animation: none; /* активный узел отличается цветом кольца и свечением */
+  }
+  .result-card {
+    opacity: 1;
+    transform: none;
+    transition: none; /* карточки появляются все сразу */
+  }
+  .step-enter,
+  .pl-error-enter {
+    animation: none;
+  }
+  .rd-toast {
+    transition: none;
+  }
+}

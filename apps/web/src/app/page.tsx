@@ -1,9 +1,18 @@
-// Каркас приложения. Страницы (/login, /register, /onboarding, /app/*)
-// реализует фронтенд-агент по docs/design/ и docs/content/COPY.md.
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { useAuth } from '@/lib/auth/auth-context';
+
+/** Корень: маршрутизация по состоянию сессии (гарды, 02-DEVELOPER §5). */
 export default function Home() {
-  return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="font-display text-36">ReplyDesk</h1>
-    </main>
-  );
+  const { status, companyId } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === 'guest') router.replace('/login');
+    else if (status === 'authed') router.replace(companyId === null ? '/onboarding' : '/app');
+  }, [status, companyId, router]);
+
+  return <div className="min-h-screen bg-bg" aria-busy="true" />;
 }

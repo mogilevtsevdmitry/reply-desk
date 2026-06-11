@@ -32,6 +32,12 @@
   --color-accent-down: #4d97ae;
   --color-accent-dim: rgba(94, 174, 199, 0.14);
 
+  /* ---------- Брендовые точки площадок (из прототипов) ---------- */
+  --color-src-yandex: #f5523a;
+  --color-src-2gis: #55b04f;
+  --color-src-ozon: #4f7df5;
+  --color-src-wb: #b65ad4;
+
   /* ---------- Severity 1–5 ---------- */
   --color-sev-1: #8a8e7e;
   --color-sev-2: #b49b55;

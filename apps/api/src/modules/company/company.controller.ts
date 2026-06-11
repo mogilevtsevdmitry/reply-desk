@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Patch, Post } from '@nestjs/common';
 import {
   CompanyDto,
+  CompanyMeResponse,
   CreateCompanyDto,
   CreateCompanyDtoSchema,
   CreateCompanyResponse,
@@ -24,9 +25,10 @@ export class CompanyController {
     return this.companyService.create(user.userId, dto);
   }
 
+  /** Компания + usage текущего периода — счётчик лимита в UI (ADR-022). */
   @Get('me')
-  async getMe(@CurrentCompanyId() companyId: string): Promise<CompanyDto> {
-    return this.companyService.getMe(companyId);
+  async getMe(@CurrentCompanyId() companyId: string): Promise<CompanyMeResponse> {
+    return this.companyService.getMeWithUsage(companyId);
   }
 
   @Patch('me')

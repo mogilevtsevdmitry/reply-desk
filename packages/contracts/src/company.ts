@@ -22,6 +22,23 @@ export const CompanyDtoSchema = z.object({
 });
 export type CompanyDto = z.infer<typeof CompanyDtoSchema>;
 
+/** Использование лимита генераций за текущий период (ADR-022). */
+export const UsageDtoSchema = z.object({
+  used: z.number().int().min(0),
+  limit: z.number().int().min(0),
+  period: z.string(), // "2026-06"
+});
+export type UsageDto = z.infer<typeof UsageDtoSchema>;
+
+/**
+ * Ответ GET /company/me: компания + usage текущего периода —
+ * счётчик лимита в сайдбаре без отдельного эндпоинта (ADR-022).
+ */
+export const CompanyMeResponseSchema = CompanyDtoSchema.extend({
+  usage: UsageDtoSchema,
+});
+export type CompanyMeResponse = z.infer<typeof CompanyMeResponseSchema>;
+
 /** POST /company — онбординг, один раз. */
 export const CreateCompanyDtoSchema = z.object({
   name: z.string().trim().min(1).max(200),

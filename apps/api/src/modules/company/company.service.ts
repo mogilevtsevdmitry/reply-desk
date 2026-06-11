@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Company, Prisma } from '@prisma/client';
 import {
   CompanyDto,
+  CompanyMeResponse,
   CreateCompanyDto,
   CreateCompanyResponse,
   ToneOfVoiceSchema,
@@ -10,12 +11,14 @@ import {
 import { AppException } from '../../common/app.exception';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
+import { UsageService } from '../usage/usage.service';
 
 @Injectable()
 export class CompanyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authService: AuthService,
+    private readonly usageService: UsageService,
   ) {}
 
   /**
@@ -56,6 +59,13 @@ export class CompanyService {
       throw new AppException('COMPANY_NOT_FOUND', 'Компания не найдена', 404);
     }
     return this.toCompanyDto(company);
+  }
+
+  /** Компания + usage текущего периода (ADR-022): счётчик лимита в сайдбаре. */
+  async getMeWithUsage(companyId: string): Promise<CompanyMeResponse> {
+    const company = await this.getMe(companyId);
+    const usage = await this.usageService.getUsage(companyId, company.plan);
+    return { ...company, usage };
   }
 
   async update(companyId: string, dto: UpdateCompanyDto): Promise<CompanyDto> {

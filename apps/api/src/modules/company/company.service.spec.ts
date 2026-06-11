@@ -3,6 +3,7 @@ import type { CreateCompanyDto } from '@replydesk/contracts';
 import { AppException } from '../../common/app.exception';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { AuthService } from '../auth/auth.service';
+import type { UsageService } from '../usage/usage.service';
 import { CompanyService } from './company.service';
 
 /** Тесты онбординга: перевыпуск access-токена с companyId (ADR-005) и 409 при повторе. */
@@ -63,11 +64,17 @@ function makeAuth(): { signAccessToken: jest.Mock } {
   };
 }
 
+function makeUsage(): UsageService {
+  return {
+    getUsage: jest.fn(async () => ({ used: 0, limit: 10, period: '2026-06' })),
+  } as unknown as UsageService;
+}
+
 describe('CompanyService — онбординг (ADR-005)', () => {
   it('создаёт компанию и возвращает НОВЫЙ accessToken с companyId', async () => {
     const tx = makeTx(null);
     const auth = makeAuth();
-    const service = new CompanyService(makePrisma(tx), auth as unknown as AuthService);
+    const service = new CompanyService(makePrisma(tx), auth as unknown as AuthService, makeUsage());
 
     const result = await service.create('u1', dto);
 
@@ -86,7 +93,7 @@ describe('CompanyService — онбординг (ADR-005)', () => {
   it('повторный POST /company → 409 COMPANY_EXISTS, компания не создаётся', async () => {
     const tx = makeTx('c1'); // у юзера уже есть компания
     const auth = makeAuth();
-    const service = new CompanyService(makePrisma(tx), auth as unknown as AuthService);
+    const service = new CompanyService(makePrisma(tx), auth as unknown as AuthService, makeUsage());
 
     await expect(service.create('u1', dto)).rejects.toMatchObject({ code: 'COMPANY_EXISTS' });
 
