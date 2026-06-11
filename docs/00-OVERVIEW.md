@@ -55,10 +55,11 @@ replydesk/
 | Шаг | Агент | Вход | Выход (артефакт) |
 |---|---|---|---|
 | 1 | Дизайнер | 01-DESIGN.md | `docs/design/`: дизайн-токены (tokens.css), HTML-прототипы экранов, UI-кит |
-| 2 | Разработчик | 02-DEVELOPER.md + выход дизайнера | рабочий код в apps/, packages/, prompts/; миграции; seed |
-| 3 | Тестировщик | 03-QA.md + код | тесты в репо, баг-репорты `docs/qa/BUGS.md`, отчёт `docs/qa/REPORT.md` |
-| 4 | Безопасник | 04-SECURITY.md + код | отчёт `docs/security/AUDIT.md` с severity, PR-фиксы критичных |
-| 5 | DevOps | 05-DEVOPS.md + код | docker/, CI, `docs/devops/RUNBOOK.md` |
+| 2 | Контент-рерайтер | 06-CONTENT.md + выход дизайнера | копидек `docs/content/COPY.md` — все тексты приложения |
+| 3 | Разработчик | 02-DEVELOPER.md + выходы дизайнера и контент-рерайтера | рабочий код в apps/, packages/, prompts/; миграции; seed |
+| 4 | Тестировщик | 03-QA.md + код | тесты в репо, баг-репорты `docs/qa/BUGS.md`, отчёт `docs/qa/REPORT.md` |
+| 5 | Безопасник | 04-SECURITY.md + код | отчёт `docs/security/AUDIT.md` с severity, PR-фиксы критичных |
+| 6 | DevOps | 05-DEVOPS.md + код | docker/, CI, `docs/devops/RUNBOOK.md` |
 
 Правило для всех: если ТЗ молчит — выбирай простейшее решение, фиксируй выбор в
 `docs/DECISIONS.md` (формат ADR: контекст / решение / последствия). Не расширяй scope.
