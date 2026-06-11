@@ -9,7 +9,9 @@ import { JwtAuthGuard } from './common/jwt-auth.guard';
 import { Env, validateEnv } from './config/env';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompanyModule } from './modules/company/company.module';
+import { GenerationModule } from './modules/generation/generation.module';
 import { HealthModule } from './modules/health/health.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 import { UsageModule } from './modules/usage/usage.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
@@ -47,6 +49,8 @@ import { RedisModule } from './redis/redis.module';
     AuthModule,
     CompanyModule,
     UsageModule,
+    ReviewsModule,
+    GenerationModule,
     HealthModule,
   ],
   providers: [

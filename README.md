@@ -22,14 +22,30 @@ packages/config     eslint / tsconfig / tailwind-preset
 pnpm install
 
 # 2. Окружение
-cp .env.example .env   # заполнить JWT_ACCESS_SECRET и DATABASE_URL
+cp .env.example .env   # заполнить JWT_ACCESS_SECRET, DATABASE_URL и ANTHROPIC_API_KEY
+                       # (или LLM_PROVIDER=fake — генерация без сети, для dev/QA)
 
 # 3. БД и запуск
 pnpm --filter @replydesk/api prisma:migrate   # применяет миграции (+ pg_trgm)
+pnpm --filter @replydesk/api db:seed          # demo@replydesk.ru / Demo12345! + 5 отзывов
 pnpm dev                                       # turbo: api на :4000, web на :3000
 ```
 
 Проверка API: `curl http://localhost:4000/api/v1/health`.
+
+## Воркер генерации (BullMQ)
+
+В dev воркер уже работает внутри процесса API (`WORKER_EMBEDDED=true`, дефолт) —
+отдельно ничего запускать не нужно. Для прод-топологии (ADR-020) API запускается
+с `WORKER_EMBEDDED=false`, а воркер — отдельным процессом из того же образа:
+
+```bash
+pnpm --filter @replydesk/api build
+pnpm --filter @replydesk/api start:worker   # node dist/worker.js
+```
+
+Статусы генерации транслируются через SSE `GET /api/v1/generations/:id/events`
+(аутентификация — заголовок Authorization, ADR-004).
 
 ## Команды качества
 
@@ -41,7 +57,9 @@ pnpm lint        # eslint из packages/config
 
 ## Статус
 
-Задача 2.1 (ядро бэкенда) выполнена: auth (JWT + ротация refresh), онбординг
-компании (ADR-005), лимиты-резервирование (ADR-002), health, схема БД и миграции.
-Дальше (2.2): ReviewsModule, GenerationModule (BullMQ + SSE), LlmModule, промпты,
-seed, фронтенд-страницы. Журнал решений — `docs/DECISIONS.md`.
+Задачи 2.1 (ядро бэкенда) и 2.2 (генерационный конвейер) выполнены: auth
+(JWT + ротация refresh), онбординг компании (ADR-005), лимиты-резервирование
+(ADR-002), ReviewsModule (создание/история/ретрай), GenerationModule
+(BullMQ-воркер + SSE-статусы), LlmModule (AnthropicProvider + FakeLlmProvider,
+ADR-019), seed с demo-данными. Дальше (2.4): фронтенд-страницы.
+Журнал решений — `docs/DECISIONS.md`.
