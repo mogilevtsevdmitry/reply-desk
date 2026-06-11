@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+@import '@replydesk/config/tailwind/theme.css';
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-text);
+}

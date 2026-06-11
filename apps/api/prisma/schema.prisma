@@ -1,0 +1,124 @@
+// Схема данных ReplyDesk — точно по docs/02-DEVELOPER.md (раздел 1).
+// Похожие отзывы: pg_trgm + GIN-индекс по "rawText" (ADR-001), индекс создаётся в миграции.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  companyId     String?        @unique
+  company       Company?       @relation(fields: [companyId], references: [id])
+  refreshTokens RefreshToken[]
+  createdAt     DateTime       @default(now())
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+}
+
+model Company {
+  id          String         @id @default(cuid())
+  name        String
+  niche       Niche
+  plan        Plan           @default(FREE)
+  toneOfVoice Json // { tone: "soft|neutral|premium", examples: string[] (до 3, по 1000 симв.), avoid? }
+  reviews     Review[]
+  usage       UsageCounter[]
+  users       User[]
+  createdAt   DateTime       @default(now())
+}
+
+enum Niche {
+  SALON
+  DENTAL
+  RESTO
+  AUTO
+  FITNESS
+  MEDICAL
+  OTHER
+}
+
+enum Plan {
+  FREE
+  START
+  BUSINESS
+}
+
+// Лимиты генераций: модель «резервирование» (ADR-002).
+model UsageCounter {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  period    String // "2026-06"
+  used      Int     @default(0)
+
+  @@unique([companyId, period])
+}
+
+model Review {
+  id         String       @id @default(cuid())
+  companyId  String
+  company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  source     ReviewSource
+  rating     Int? // 1..5
+  rawText    String // до 4000 символов
+  category   Category?
+  severity   Int?
+  isFakeSusp Boolean      @default(false)
+  generation Generation?
+  createdAt  DateTime     @default(now())
+
+  @@index([companyId, createdAt])
+}
+
+enum ReviewSource {
+  YANDEX_MAPS
+  TWOGIS
+  OZON
+  WILDBERRIES
+  OTHER
+}
+
+enum Category {
+  SERVICE
+  QUALITY
+  STAFF
+  PRICE
+  WAITING
+  OTHER
+}
+
+model Generation {
+  id             String    @id @default(cuid())
+  reviewId       String    @unique
+  review         Review    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  status         GenStatus @default(PENDING)
+  publicReplies  Json? // { soft, neutral, confident, platformNotes }
+  internalTask   Json? // { what, probableCause, toCheck[], assigneeRole }
+  classification Json? // { category, severity, isRepeat, similarReviewIds[], fakeSuspicion: {flag, reason} }
+  winback        Json? // { message, compensation: {type, rationale} }
+  error          String?
+  tokensUsed     Int?
+  createdAt      DateTime  @default(now())
+}
+
+enum GenStatus {
+  PENDING
+  ANALYZING
+  GENERATING
+  DONE
+  FAILED
+}

@@ -1,0 +1,83 @@
+/* ============================================================
+   ReplyDesk — Tailwind 4 theme preset.
+   Источник истины значений: docs/design/tokens.css.
+   Подключение в приложении:
+     @import "tailwindcss";
+     @import "@replydesk/config/tailwind/theme.css";
+   ============================================================ */
+
+@theme {
+  /* ---------- Палитра ---------- */
+  --color-graphite: #18140f;
+  --color-soot: #211c15;
+  --color-ivory: #ece5d8;
+  --color-smoke: #a89d8b;
+  --color-steel: #5eaec7;
+  --color-scarlet: #e25549;
+
+  /* ---------- Производные поверхности ---------- */
+  --color-bg: #18140f;
+  --color-surface: #211c15;
+  --color-surface-2: #292318;
+  --color-line: #3a3226;
+  --color-line-strong: #4d4334;
+  --color-ink: #ece5d8;
+  --color-ink-muted: #a89d8b;
+  --color-ink-faint: #8d8376;
+  --color-ink-on-accent: #0d1a1f;
+
+  /* ---------- Акцент ---------- */
+  --color-accent: #5eaec7;
+  --color-accent-hover: #74bdd3;
+  --color-accent-down: #4d97ae;
+  --color-accent-dim: rgba(94, 174, 199, 0.14);
+
+  /* ---------- Severity 1–5 ---------- */
+  --color-sev-1: #8a8e7e;
+  --color-sev-2: #b49b55;
+  --color-sev-3: #c9803d;
+  --color-sev-4: #d96a45;
+  --color-sev-5: #e25549;
+
+  /* ---------- Семантика ---------- */
+  --color-ok: #7da06a;
+  --color-danger: #e25549;
+  --color-danger-dim: rgba(214, 58, 49, 0.12);
+
+  /* ---------- Типографика ---------- */
+  --font-display: 'Prata', 'Georgia', serif;
+  --font-text: 'Golos Text', 'Arial', sans-serif;
+
+  --text-12: 0.75rem;
+  --text-13: 0.8125rem;
+  --text-14: 0.875rem;
+  --text-16: 1rem;
+  --text-18: 1.125rem;
+  --text-22: 1.375rem;
+  --text-28: 1.75rem;
+  --text-36: 2.25rem;
+  --text-48: 3rem;
+
+  --leading-tight: 1.15;
+  --leading-base: 1.5;
+  --leading-loose: 1.65;
+
+  --tracking-caps: 0.08em;
+
+  /* ---------- Радиусы ---------- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* ---------- Тени ---------- */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-3: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --shadow-glow-accent:
+    0 0 0 1px rgba(94, 174, 199, 0.35), 0 0 24px rgba(94, 174, 199, 0.18);
+
+  /* ---------- Анимация ---------- */
+  --ease-out-rd: cubic-bezier(0.22, 0.61, 0.21, 1);
+  --ease-in-out-rd: cubic-bezier(0.6, 0, 0.3, 1);
+}
