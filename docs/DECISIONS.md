@@ -416,6 +416,76 @@ email не восстанавливается: JWT содержит только
 персистирования. В будущем `/auth/me`-эндпоинт или email в JWT-payload устранят необходимость
 в этом слое.
 
+## ADR-027: Хост-порты compose-стенда параметризованы env, дефолты 3200/4200 (2026-06-12)
+
+**Контекст.** 05-DEVOPS целится в «`docker compose up` → приложение на localhost:3000»,
+но bare-metal dev-стенд (`pnpm dev`) уже занимает 3000 (web) и 4000 (api); compose-стенд
+должен сосуществовать с ним на одной машине (dev, CI, демо).
+
+**Решение.** Все публикуемые порты в `docker/compose.yaml` — через env с дефолтами:
+`WEB_PORT=3200`, `API_PORT=4200` (dev-оверрайд дополнительно: `PG_PORT=54325`,
+`REDIS_PORT=63793`). Наружу публикуются только web и api; postgres/redis — во внутренней
+сети, их порты открывает только `compose.dev.yaml`. Дефолт `NEXT_PUBLIC_API_URL`
+в `.env.example` указывает на compose-стенд (`http://localhost:4200/api/v1`);
+bare-dev фронтенд использует встроенный фолбэк `:4000` (Next.js не читает корневой .env).
+`CORS_ORIGINS` в `.env.example` включает оба origin'а (:3000 и :3200).
+
+**Последствия.** `cp .env.example .env && docker compose -f docker/compose.yaml
+--env-file .env up --build` работает на машине с запущенным bare-dev. Желающие
+канонический :3000 ставят `WEB_PORT=3000` в .env. Отклонение от буквы ТЗ
+(«localhost:3000») зафиксировано здесь.
+
+## ADR-028: Мигратор — отдельный target в api.Dockerfile и 4-й образ в GHCR (2026-06-12)
+
+**Контекст.** `prisma migrate deploy` и seed (`tsx prisma/seed.ts`) требуют dev-зависимостей
+(prisma CLI, tsx), которых нет в прод-образе api (<300MB). ТЗ требует одноразовый
+migrate-сервис в compose и порядок первого запуска migrate → api/worker → web в Dokploy.
+
+**Решение.** В `docker/api.Dockerfile` добавлен target `migrate` (наследует build-стейдж
+с полными node_modules; CMD: `prisma migrate deploy` + seed при `SEED_ON_START=true`).
+Compose собирает его через `target: migrate`; CI публикует как 4-й образ
+`ghcr.io/<repo>/migrate` (тяжёлый, ~1.5GB — приемлемо: запускается одноразово,
+слои кэшируются). Seed включается только явным флагом `SEED_ON_START=true`.
+
+**Последствия.** Один Dockerfile — единый источник для api/migrate (нет дрейфа версий
+prisma между миграцией и рантаймом). В Dokploy migrate запускается как сервис и
+останавливается после кода выхода 0 (ручной шаг, см. DEPLOY.md).
+
+## ADR-029: CSP веб-фронтенда — в next.config.ts, а не на Traefik (AUDIT-001) (2026-06-12)
+
+**Контекст.** AUDIT-001 (medium): HTML-поверхность web не покрыта CSP. Варианты:
+заголовки в `next.config.ts` (`headers()`) или labels на Traefik-уровне.
+
+**Решение.** CSP задаётся в `next.config.ts`: политика версионируется вместе с кодом,
+действует во всех окружениях (dev, compose, e2e, Dokploy), а не только за прокси,
+и видит `NEXT_PUBLIC_API_URL` для `connect-src`. Политика:
+`default-src 'self'; script-src 'self' 'unsafe-inline' (+'unsafe-eval' только в dev);
+style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src fonts.gstatic.com;
+connect-src 'self' <origin API>; frame-ancestors 'none'; object-src 'none'; base-uri 'self'`
++ X-Content-Type-Options/X-Frame-Options/Referrer-Policy.
+
+**Последствия.** AUDIT-001 закрыт. `script-src 'unsafe-inline'` оставлен осознанно:
+App Router использует inline-скрипты, строгий nonce-CSP требует middleware — вне scope
+MVP (отдельная задача при ужесточении). Traefik security-заголовки не дублируем —
+один источник истины.
+
+## ADR-030: E2E-стенд CI — отдельный docker/compose.e2e.yaml с контрактом QA (2026-06-12)
+
+**Контекст.** CI-джоба e2e должна «поднять compose и прогнать Playwright», но
+`apps/web/e2e/global-setup.ts` зашивает контракт QA-стенда: API :4100, Web :3100,
+сброс БД через `docker exec rd-e2e-pg psql -U replydesk_e2e -d replydesk_e2e`.
+
+**Решение.** Отдельный `docker/compose.e2e.yaml` (project `replydesk-e2e`):
+container_name `rd-e2e-pg`/`rd-e2e-redis`, учётки `replydesk_e2e`, api на :4100
+с `LLM_PROVIDER=fake`, embedded-воркером и поднятыми throttler-лимитами (ADR-025),
+web на :3100 собирается с build-arg `NEXT_PUBLIC_API_URL=http://localhost:4100/api/v1`.
+Несекретные тестовые значения — в коммитнутом `docker/e2e.env`.
+
+**Последствия.** E2E в CI гоняется против прод-образов (тех же Dockerfile, что едут
+в GHCR) — сборка проверяется e2e-прогоном. Локально файл не запускать при живом
+QA-стенде (конфликт имён контейнеров). Тестовый env-файл в гите — осознанное
+исключение из правила «секреты только в .env» (секретов не содержит).
+
 ## Зафиксированные мелочи
 
 - Повторное использование старого refresh-токена → ревокация **всех** refresh-токенов

@@ -12,6 +12,9 @@ import {
 /** Параллелизм воркера (ТЗ: concurrency 5). */
 const WORKER_CONCURRENCY = 5;
 
+/** Лимит graceful-закрытия по SIGTERM (05-DEVOPS: BullMQ close с таймаутом 30с). */
+const GRACEFUL_CLOSE_TIMEOUT_MS = 30_000;
+
 /**
  * BullMQ-воркер очереди `generation` (ADR-020):
  * - в процессе API стартует на bootstrap, если WORKER_EMBEDDED=true (dev-дефолт);
@@ -48,7 +51,26 @@ export class GenerationWorkerService implements OnApplicationBootstrap, OnApplic
     this.logger.log(`Воркер очереди "${GENERATION_QUEUE_NAME}" запущен (concurrency=${WORKER_CONCURRENCY})`);
   }
 
+  /**
+   * Graceful shutdown по SIGTERM (05-DEVOPS): воркер дорабатывает активные job,
+   * но не дольше 30 секунд — затем форсированное закрытие соединения.
+   */
   async onApplicationShutdown(): Promise<void> {
-    await this.worker?.close().catch(() => undefined);
+    const worker = this.worker;
+    if (!worker) return;
+    this.worker = null;
+    const force = setTimeout(() => {
+      this.logger.warn('Graceful-закрытие воркера не уложилось в 30с — форсирую close(true)');
+      void worker.close(true).catch(() => undefined);
+    }, GRACEFUL_CLOSE_TIMEOUT_MS);
+    force.unref();
+    try {
+      await worker.close();
+      this.logger.log('Воркер очереди generation корректно остановлен');
+    } catch {
+      // соединение уже закрыто форсированно — ок
+    } finally {
+      clearTimeout(force);
+    }
   }
 }

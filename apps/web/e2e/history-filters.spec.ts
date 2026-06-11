@@ -5,7 +5,7 @@
  */
 
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
-import { BASE_URL, API_URL, apiCreateReview, pollReviewStatus } from './helpers';
+import { BASE_URL, apiCreateReview, pollReviewStatus } from './helpers';
 import { getFixture } from './fixtures';
 
 test.describe('Сценарий 2: Фильтры истории', () => {

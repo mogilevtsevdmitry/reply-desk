@@ -48,7 +48,9 @@
 4. Промпты: base, platforms, fake-detection, 7 нишевых файлов (русский, содержательные)
 5. Frontend: auth → onboarding → главный экран (SSE, анимация по MOTION.md) → history →
    settings
-- **Гейт:** happy path руками + юнит-тесты зелёные, ревью Дмитрия — код готов
+- **Гейт:** happy path руками + юнит-тесты зелёные, ревью Дмитрия — ✅ пройден
+  (2.1 ядро + 2.2 конвейер + 2.3 промпты + 2.4 фронтенд; live-стенд проверен Дмитрием;
+  доработка по фидбэку: блок «Исходный отзыв» + authorName, ADR-024) — код готов
   (выполнено 4 подзадачами: 2.1 ядро бэкенда, 2.2 генерационный конвейер, 2.3 промпты,
   2.4 фронтенд; 55 юнит-тестов, typecheck/lint/build зелёные, живой смоук всех сценариев
   на fake-провайдере; ADR-014…023). Ожидает ревью Дмитрия.
@@ -58,21 +60,25 @@
 `docs/qa/REPORT.md`. LLM всегда мокается (FakeLlmProvider: валидный/невалидный JSON,
 таймаут, сетевая ошибка). Вся матрица из 03-QA.md, включая новые кейсы:
 компенсация лимита при FAILED, retry-флоу, изоляция similarReviewIds по тенанту.
-- **Гейт:** blocker/major багов нет или исправлены разработчиком; вердикт в REPORT.md
+- **Гейт:** blocker/major багов нет или исправлены разработчиком; вердикт в REPORT.md —
+  ✅ пройден (112/112 зелёных: 58 юнит + 38 интеграционных + 16 E2E; BUG-001..005 закрыты)
 
 ### Этап 4 — Безопасник (04-SECURITY.md)
 Выход: `docs/security/AUDIT.md` (находки с severity, прогон prompt-injection проб),
 атомарные коммиты фиксов critical/high.
 - Главный фокус: изоляция тенантов построчно (companyId из JWT везде), IDOR-прогон,
   SSE-проверка до подписки, валидация similarReviewIds
-- **Гейт:** critical/high исправлены, QA-тесты после фиксов зелёные
+- **Гейт:** critical/high исправлены, QA-тесты после фиксов зелёные — ✅ пройден
+  (0 critical/high; 1 medium закрыт DevOps-этапом через CSP, ADR-029; 4 low в AUDIT.md)
 
 ### Этап 5 — DevOps (05-DEVOPS.md)
 Выход: 3 Dockerfile (api, worker, web; < 300MB для web/api), compose + compose.dev,
 CI (lint → test → e2e → build → audit), `docs/devops/DEPLOY.md` (Dokploy/Traefik),
 `docs/devops/RUNBOOK.md`. Postgres — `postgres:16-alpine`.
 - **Гейт = DoD проекта:** чистый клон → `cp .env.example .env` + LLM-ключ →
-  `docker compose up` → полный happy path; CI зелёный
+  `docker compose up` → полный happy path; CI зелёный — ✅ пройден локально
+  (compose-смоук: migrate → healthy → register → генерация → DONE; образы < 300MB;
+  «CI зелёный на тестовом PR + образы в GHCR» — проверяется после пуша в GitHub)
 
 ## Сквозные правила
 

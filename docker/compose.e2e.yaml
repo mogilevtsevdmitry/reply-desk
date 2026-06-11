@@ -1,0 +1,84 @@
+# ============================================================================
+# E2E-стенд для CI (ADR-030): воспроизводит изолированное окружение QA
+# (API :4100, Web :3100, LLM_PROVIDER=fake, контейнеры rd-e2e-pg/rd-e2e-redis —
+# имена/учётки зашиты в apps/web/e2e/global-setup.ts, который сбрасывает БД
+# через `docker exec rd-e2e-pg psql -U replydesk_e2e`).
+#
+# Значения в docker/e2e.env — НЕ секреты (тестовые заглушки для CI).
+# Локально НЕ запускать при живом QA-стенде — конфликт имён контейнеров.
+#
+#   docker compose -f docker/compose.e2e.yaml up --build -d --wait
+#   pnpm --filter @replydesk/web test:e2e
+# ============================================================================
+name: replydesk-e2e
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rd-e2e-pg
+    environment:
+      POSTGRES_USER: replydesk_e2e
+      POSTGRES_PASSWORD: replydesk_e2e
+      POSTGRES_DB: replydesk_e2e
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U replydesk_e2e -d replydesk_e2e"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    container_name: rd-e2e-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+      target: migrate
+    restart: "no"
+    env_file:
+      - e2e.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    env_file:
+      - e2e.env
+    ports:
+      - "4100:4000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1G # embedded-воркер внутри API (e2e-топология)
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4100/api/v1
+    environment:
+      NODE_ENV: production
+    ports:
+      - "3100:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M

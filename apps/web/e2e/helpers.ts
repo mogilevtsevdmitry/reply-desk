@@ -115,7 +115,7 @@ export async function waitForGenerationDone(
     const res = await fetch(`${API_URL}/reviews?pageSize=1`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    const data = (await res.json()) as { items: Array<{ generation?: { status: string } }> };
+    void (await res.json()); // тело дочитываем, результат не нужен (lint: no-unused-vars)
     // Проверяем через polling REST, не через SSE (SSE требует fetch+stream)
     // Используем GET /reviews/:id чтобы получить конкретную генерацию
     const genRes = await fetch(`${API_URL}/generations/${generationId}/status`, {

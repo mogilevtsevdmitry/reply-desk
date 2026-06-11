@@ -1,0 +1,28 @@
+# Контекст сборки — корень монорепо (docker/*.Dockerfile)
+# Секреты НИКОГДА не попадают в образ
+.env
+.env.*
+!.env.example
+
+# Артефакты и зависимости — ставятся/собираются внутри контейнера
+node_modules
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+
+# Тестовые артефакты и фикстуры
+apps/web/playwright-report
+apps/web/test-results
+apps/web/e2e/fixtures
+
+# Не нужно образам
+.git
+.github
+.claude
+docs
+*.md
+.DS_Store
+**/.DS_Store

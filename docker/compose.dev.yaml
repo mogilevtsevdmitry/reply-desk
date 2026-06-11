@@ -1,0 +1,51 @@
+# ============================================================================
+# Dev-оверрайд (05-DEVOPS): bind-mount исходников, hot-reload, открытые порты БД.
+#
+# Запуск из корня репозитория:
+#   docker compose -f docker/compose.yaml -f docker/compose.dev.yaml --env-file .env up --build
+#
+# api/web запускаются из build-стейджа (полные node_modules) в watch-режиме;
+# воркер embedded в процессе API (WORKER_EMBEDDED=true) — отдельный сервис worker
+# выключен профилем. БД/Redis опубликованы на нестандартных портах (ADR-027).
+# ============================================================================
+services:
+  postgres:
+    ports:
+      - "${PG_PORT:-54325}:5432"
+
+  redis:
+    ports:
+      - "${REDIS_PORT:-63793}:6379"
+
+  api:
+    build:
+      target: build
+    command: pnpm --filter @replydesk/api dev
+    working_dir: /app
+    environment:
+      NODE_ENV: development
+      WORKER_EMBEDDED: "true" # dev-режим: воркер внутри процесса API (ADR-020)
+      PROMPTS_DIR: /app/prompts
+    volumes:
+      - ../apps/api/src:/app/apps/api/src
+      - ../apps/api/prisma:/app/apps/api/prisma
+      - ../packages/contracts/src:/app/packages/contracts/src
+      - ../prompts:/app/prompts
+
+  # В dev не нужен — воркер embedded в API; профиль не активируется по умолчанию
+  worker:
+    profiles:
+      - separate-worker
+
+  web:
+    build:
+      target: build
+    command: pnpm --filter @replydesk/web dev
+    working_dir: /app
+    environment:
+      NODE_ENV: development
+      # next dev читает env в рантайме (бакирование — только у next build, BUG-003)
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4200/api/v1}
+    volumes:
+      - ../apps/web/src:/app/apps/web/src
+      - ../packages/contracts/src:/app/packages/contracts/src

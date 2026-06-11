@@ -12,10 +12,21 @@ packages/contracts  zod-схемы DTO, общие для api и web
 packages/config     eslint / tsconfig / tailwind-preset
 ```
 
-## Запуск dev (черновик)
+## Запуск одной командой (docker compose)
 
-Требования: Node.js >= 22, pnpm 10, PostgreSQL 16 и Redis 7
-(docker compose появится на этапе DevOps).
+```bash
+cp .env.example .env   # заполнить ANTHROPIC_API_KEY (или поставить LLM_PROVIDER=fake)
+docker compose -f docker/compose.yaml --env-file .env up --build -d
+```
+
+Web: http://localhost:3200, API: http://localhost:4200/api/v1 (порты настраиваются
+в .env, ADR-027). Demo-данные: `SEED_ON_START=true` в .env перед первым запуском.
+Dev-режим с hot-reload: добавить `-f docker/compose.dev.yaml`. Деплой — `docs/devops/DEPLOY.md`,
+эксплуатация — `docs/devops/RUNBOOK.md`.
+
+## Запуск dev (bare-metal)
+
+Требования: Node.js >= 22, pnpm 10, PostgreSQL 16 и Redis 7.
 
 ```bash
 # 1. Зависимости

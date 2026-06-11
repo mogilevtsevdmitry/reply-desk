@@ -1,0 +1,151 @@
+# ============================================================================
+# CI ReplyDesk (05-DEVOPS): lint-typecheck → test → e2e → build-images → audit.
+# Триггер: PR и push в main. На push в main образы пушатся в GHCR (sha + latest).
+# ============================================================================
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  TURBO_TELEMETRY_DISABLED: "1"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  lint-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # версия pnpm — из packageManager в package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Юнит-тесты (apps/api)
+        run: pnpm --filter @replydesk/api test
+      - name: Интеграционные тесты (Testcontainers postgres/redis)
+        run: pnpm --filter @replydesk/api test:int
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Поднять e2e-стенд (compose, API :4100 / Web :3100, LLM_PROVIDER=fake)
+        run: docker compose -f docker/compose.e2e.yaml up --build -d
+      - name: Дождаться health стенда
+        run: |
+          timeout 300 bash -c 'until curl -fsS http://localhost:4100/api/v1/health >/dev/null; do sleep 3; done'
+          timeout 120 bash -c 'until curl -fsS http://localhost:3100/login >/dev/null; do sleep 3; done'
+      - run: pnpm install --frozen-lockfile
+      - name: Установить браузер Playwright
+        run: pnpm --filter @replydesk/web exec playwright install chromium --with-deps
+      - name: Playwright E2E
+        run: pnpm --filter @replydesk/web test:e2e
+        env:
+          CI: "true"
+      - name: Логи стенда при падении
+        if: failure()
+        run: docker compose -f docker/compose.e2e.yaml logs --no-color --tail 300
+      - name: Артефакт — трейсы/скриншоты упавших тестов
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failures
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+          retention-days: 7
+      - name: Остановить стенд
+        if: always()
+        run: docker compose -f docker/compose.e2e.yaml down -v
+
+  build-images:
+    runs-on: ubuntu-latest
+    needs: [lint-typecheck, test]
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: api
+            dockerfile: docker/api.Dockerfile
+            target: runner
+          - image: worker
+            dockerfile: docker/worker.Dockerfile
+            target: runner
+          - image: web
+            dockerfile: docker/web.Dockerfile
+            target: runner
+          # ADR-028: одноразовый мигратор (prisma migrate deploy + seed) — 4-й образ
+          - image: migrate
+            dockerfile: docker/api.Dockerfile
+            target: migrate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Логин в GHCR (только push в main)
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.image }}
+          tags: |
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Сборка (и пуш в GHCR на push в main)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:4200/api/v1' }}
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: pnpm audit --prod (fail на critical)
+        run: pnpm audit --prod --audit-level critical
