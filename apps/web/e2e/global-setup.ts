@@ -103,21 +103,24 @@ async function apiGetCompanyToken(
 /**
  * Do a full UI session creation and save Playwright storageState.
  *
- * Strategy (ADR-025):
+ * Strategy (ADR-025, уточнено после первого прогона CI):
  * 1. Register via API first (idempotent — 409 means already exists).
- * 2. If user is new → register via UI form (sets rd_refresh cookie) → complete onboarding.
- * 3. If user already exists → login via UI form.
+ *    After this call the user ALWAYS exists, so a UI register attempt would
+ *    get 409 and never redirect (this exact bug broke global-setup on the
+ *    fresh CI database; locally users persisted between runs and masked it).
+ * 2. Always login via UI form. For a brand-new user (no company yet) the
+ *    GuestOnly guard redirects to /onboarding (guards.tsx), which is
+ *    completed below; existing users land on /app directly.
  *    IMPORTANT: existing users may already have a valid rd_refresh cookie in storageState.
  *    We use a fresh context (no prior cookies) to force a new login.
  *
- * Using register/login via UI rather than pure API calls ensures the httpOnly
+ * Using login via UI rather than pure API calls ensures the httpOnly
  * rd_refresh cookie is set on the correct API origin, so storageState captures it.
  */
 async function createUserSession(
   email: string,
   password: string,
   stateFile: string,
-  isNew: boolean,
 ): Promise<void> {
   const browser = await chromium.launch({ headless: true });
   // Fresh context — NO prior storageState, so rd_refresh cookie is absent
@@ -126,27 +129,18 @@ async function createUserSession(
   const page = await context.newPage();
 
   try {
-    if (isNew) {
-      // Register via UI form → redirects to /onboarding
-      await page.goto(BASE_URL + '/register');
-      await page.getByLabel('Электронная почта').fill(email);
-      await page.getByLabel('Пароль').fill(password);
-      await page.getByRole('button', { name: 'Создать аккаунт' }).click();
-      await page.waitForURL(/\/onboarding/, { timeout: 20_000 });
-    } else {
-      // Login via UI form.
-      // Go to /login → wait for the auth bootstrap to finish (status: loading → guest)
-      // before filling the form. This prevents a race where the page auto-redirects
-      // if a stale cookie triggers a successful /auth/refresh.
-      await page.goto(BASE_URL + '/login');
-      // Wait until the form is actually visible (bootstrap done → status=guest → GuestOnly renders form)
-      await page.getByLabel('Электронная почта').waitFor({ state: 'visible', timeout: 10_000 });
-      await page.getByLabel('Электронная почта').fill(email);
-      await page.getByLabel('Пароль').fill(password);
-      await page.getByRole('button', { name: 'Войти в пульт' }).click();
-      // After login, the GuestOnly guard fires router.replace('/app') — wait for it
-      await page.waitForURL(/\/(app|onboarding)/, { timeout: 20_000 });
-    }
+    // Login via UI form.
+    // Go to /login → wait for the auth bootstrap to finish (status: loading → guest)
+    // before filling the form. This prevents a race where the page auto-redirects
+    // if a stale cookie triggers a successful /auth/refresh.
+    await page.goto(BASE_URL + '/login');
+    // Wait until the form is actually visible (bootstrap done → status=guest → GuestOnly renders form)
+    await page.getByLabel('Электронная почта').waitFor({ state: 'visible', timeout: 10_000 });
+    await page.getByLabel('Электронная почта').fill(email);
+    await page.getByLabel('Пароль').fill(password);
+    await page.getByRole('button', { name: 'Войти в пульт' }).click();
+    // After login, the GuestOnly guard fires router.replace('/app' | '/onboarding') — wait for it
+    await page.waitForURL(/\/(app|onboarding)/, { timeout: 20_000 });
 
     if (page.url().includes('/onboarding')) {
       // Complete onboarding (3 steps, single /onboarding URL — no navigation between steps)
@@ -226,12 +220,13 @@ export default async function globalSetup(): Promise<void> {
     const stateFile = path.join(FIXTURES_DIR, `${def.key}-state.json`);
 
     try {
-      // Register via API (idempotent — 409 means already exists)
-      const isNew = await apiRegister(def.email, password);
+      // Register via API (idempotent — 409 means already exists).
+      // После этого пользователь существует всегда → в браузере только login.
+      await apiRegister(def.email, password);
       await wait(500);
 
       // Full browser session to get proper cookies
-      await createUserSession(def.email, password, stateFile, isNew);
+      await createUserSession(def.email, password, stateFile);
 
       // Also get API tokens for test helpers (creating reviews etc.)
       await wait(2000); // wait after UI login to avoid rate limit on API login below

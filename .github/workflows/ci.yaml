@@ -41,6 +41,14 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Jest резолвит @replydesk/contracts через dist (exports пакета),
+      # а сервисы используют сгенерированный Prisma-клиент. В джобе
+      # lint-typecheck это происходит неявно (turbo ^typecheck + prisma
+      # generate в script), здесь собираем артефакты явно.
+      - name: Сборка contracts и генерация Prisma-клиента
+        run: |
+          pnpm --filter @replydesk/contracts build
+          pnpm --filter @replydesk/api prisma:generate
       - name: Юнит-тесты (apps/api)
         run: pnpm --filter @replydesk/api test
       - name: Интеграционные тесты (Testcontainers postgres/redis)
