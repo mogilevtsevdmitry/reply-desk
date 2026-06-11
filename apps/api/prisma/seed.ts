@@ -27,6 +27,8 @@ function daysAgo(days: number): Date {
 interface SeedReview {
   source: 'YANDEX_MAPS' | 'TWOGIS' | 'OZON' | 'WILDBERRIES' | 'OTHER';
   rating: number | null;
+  /** Имя клиента (опциональное поле формы) — есть не у всех demo-отзывов. */
+  authorName?: string;
   rawText: string;
   createdAt: Date;
   /** Индексы (в массиве seed-отзывов) похожих отзывов для classification. */
@@ -39,6 +41,7 @@ const REVIEWS: SeedReview[] = [
   {
     source: 'YANDEX_MAPS',
     rating: 2,
+    authorName: 'Анна',
     rawText:
       'Записывалась на маникюр на 14:00, пришла вовремя, а мастер приняла меня только через сорок минут. Никто даже не извинился, администратор просто пожала плечами. Очень неприятно.',
     createdAt: daysAgo(9),
@@ -187,6 +190,7 @@ const REVIEWS: SeedReview[] = [
   {
     source: 'YANDEX_MAPS',
     rating: 5,
+    authorName: 'Марина',
     rawText:
       'Спасибо Ольге за окрашивание! Цвет получился ровно такой, как я хотела, бережно отнеслась к волосам, рассказала про уход. Атмосфера в салоне приятная, кофе вкусный. Обязательно вернусь!',
     createdAt: daysAgo(5),
@@ -328,6 +332,7 @@ async function main(): Promise<void> {
         companyId: company.id,
         source: seed.source,
         rating: seed.rating,
+        authorName: seed.authorName ?? null,
         rawText: seed.rawText,
         category: payload.classification.category,
         severity: payload.classification.severity,

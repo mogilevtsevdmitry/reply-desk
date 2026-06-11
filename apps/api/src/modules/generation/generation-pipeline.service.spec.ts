@@ -51,6 +51,7 @@ function setup(llmResult: () => Promise<{ data: unknown; tokensUsed: number }>):
           companyId: 'company-1',
           source: 'YANDEX_MAPS',
           rating: 2,
+          authorName: null,
           rawText: 'Текст отзыва',
           company: {
             id: 'company-1',

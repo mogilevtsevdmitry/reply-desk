@@ -50,6 +50,7 @@ export class ReviewsService {
           companyId,
           source: dto.source,
           rating: dto.rating ?? null,
+          authorName: dto.authorName ?? null,
           rawText: dto.rawText,
         },
       });
@@ -153,6 +154,7 @@ export class ReviewsService {
       id: review.id,
       source: review.source,
       rating: review.rating,
+      authorName: review.authorName,
       rawText: review.rawText,
       category: review.category,
       severity: review.severity,

@@ -9,6 +9,7 @@ import { copy, repeatTitle, resultMeta } from '@/lib/copy';
 import { formatDateTime, formatDay } from '@/lib/format';
 import { useReducedMotion } from '@/lib/hooks';
 import { categoryLabels, sourceLabels, sourceReplyNotes } from '@/lib/labels';
+import { SourceReviewCard, type SourceReviewData } from '../review/source-review-card';
 import { CopyButton } from '../ui/copy-button';
 import { SevComb } from '../ui/sev-comb';
 
@@ -32,11 +33,14 @@ export function ResultCards({
   payload,
   source,
   createdAt,
+  review,
   animate = true,
 }: {
   payload: GenerationPayload;
   source: ReviewSource;
   createdAt: string;
+  /** Исходный отзыв клиента — блок над карточками (если передан). */
+  review?: SourceReviewData;
   animate?: boolean;
 }) {
   const reduced = useReducedMotion();
@@ -65,6 +69,8 @@ export function ResultCards({
           {resultMeta(sourceLabels[source], formatDateTime(createdAt))}
         </div>
       </div>
+
+      {review ? <SourceReviewCard review={review} /> : null}
 
       <div className="grid grid-cols-1 gap-4 min-[881px]:grid-cols-2">
         <PublicReplyCard payload={payload} source={source} className={cardClass(0)} />

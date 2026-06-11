@@ -92,6 +92,9 @@ export const copy = {
   genSourceLabel: 'Площадка',
   genRatingLabel: 'Оценка клиента',
   genRatingHint: 'Если на площадке нет оценки — пропустите',
+  genAuthorLabel: 'Имя клиента',
+  genAuthorPlaceholder: 'Как клиент подписан на площадке, например Анна',
+  genAuthorHint: 'Необязательно — если указать, AI обратится к клиенту по имени',
   genSubmit: 'Сгенерировать пакет реакции',
   genLimitNoteZero: 'Лимит месяца исчерпан',
 
@@ -107,6 +110,7 @@ export const copy = {
 
   // ---------- 4. Карточки результата ----------
   resultTitle: 'Пакет реакции готов',
+  resultReviewTitle: 'Исходный отзыв',
   cardReplyTitle: 'Публичный ответ',
   cardReplyTabsAria: 'Тон ответа',
   cardReplyTabSoft: 'Мягкий',

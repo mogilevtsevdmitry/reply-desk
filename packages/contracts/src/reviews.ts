@@ -6,6 +6,7 @@ import { GenerationDtoSchema } from './generation';
 export const CreateReviewDtoSchema = z.object({
   source: ReviewSourceSchema,
   rating: z.number().int().min(1).max(5).optional(),
+  authorName: z.string().trim().min(1).max(100).optional(),
   rawText: z.string().trim().min(1).max(4000),
 });
 export type CreateReviewDto = z.infer<typeof CreateReviewDtoSchema>;
@@ -39,6 +40,7 @@ export const ReviewDtoSchema = z.object({
   id: z.string(),
   source: ReviewSourceSchema,
   rating: z.number().int().min(1).max(5).nullable(),
+  authorName: z.string().nullable(),
   rawText: z.string(),
   category: CategorySchema.nullable(),
   severity: z.number().int().min(1).max(5).nullable(),

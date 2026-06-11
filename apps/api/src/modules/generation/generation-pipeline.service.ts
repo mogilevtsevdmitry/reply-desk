@@ -95,6 +95,7 @@ export class GenerationPipelineService {
       const user = buildUserPrompt({
         source: review.source,
         rating: review.rating,
+        authorName: review.authorName,
         rawText: review.rawText,
       });
 

@@ -28,6 +28,8 @@ export interface BuildSystemPromptOptions {
 export interface BuildUserPromptOptions {
   source: ReviewSource;
   rating: number | null;
+  /** Имя клиента из формы (опционально); в логи не пишется, как и rawText. */
+  authorName: string | null;
   rawText: string;
 }
 
@@ -161,6 +163,9 @@ export function buildUserPrompt(opts: BuildUserPromptOptions): string {
   const lines = [`Площадка: ${opts.source}`];
   if (opts.rating !== null) {
     lines.push(`Оценка клиента: ${opts.rating} из 5`);
+  }
+  if (opts.authorName !== null && opts.authorName.trim() !== '') {
+    lines.push(`Имя клиента: ${opts.authorName.trim()}`);
   }
   lines.push('', '<review>', safeText, '</review>');
   return lines.join('\n');

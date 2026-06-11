@@ -74,6 +74,7 @@ model Review {
   company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   source     ReviewSource
   rating     Int? // 1..5
+  authorName String? // имя клиента, до 100 символов
   rawText    String // до 4000 символов
   category   Category?
   severity   Int?

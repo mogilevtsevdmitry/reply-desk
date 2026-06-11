@@ -15,21 +15,31 @@ import { createReview } from '@/lib/api/endpoints';
 import { copy, genLimitNote, ratingAria } from '@/lib/copy';
 import { useCompanyMe } from '@/lib/hooks';
 import { sourceDotClass, sourceLabels } from '@/lib/labels';
+import { type SourceReviewData } from '../review/source-review-card';
 import { Button } from '../ui/button';
 import { useToast } from '../ui/toast';
 import { GenerationRun } from './generation-run';
 import { ResultCards } from './result-cards';
 
 const REVIEW_MAX = 4000;
+const AUTHOR_MAX = 100;
 
 type Screen =
   | { kind: 'form' }
-  | { kind: 'pipeline'; run: CreateReviewResponse; reviewText: string; source: ReviewSource }
+  | {
+      kind: 'pipeline';
+      run: CreateReviewResponse;
+      reviewText: string;
+      source: ReviewSource;
+      rating: number | null;
+      authorName: string | null;
+    }
   | {
       kind: 'result';
       payload: GenerationPayload;
       source: ReviewSource;
       createdAt: string;
+      review: SourceReviewData;
     };
 
 /** Главный экран /app: три состояния — пустое / пайплайн / результат. */
@@ -42,6 +52,7 @@ export function GeneratePage() {
   const [text, setText] = useState('');
   const [source, setSource] = useState<ReviewSource>('YANDEX_MAPS');
   const [rating, setRating] = useState<number | null>(null);
+  const [authorName, setAuthorName] = useState('');
   const [textError, setTextError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -55,6 +66,7 @@ export function GeneratePage() {
         setScreen({ kind: 'form' });
         setText('');
         setRating(null);
+        setAuthorName('');
         setTextError(null);
       }
     };
@@ -75,13 +87,22 @@ export function GeneratePage() {
     }
     setTextError(null);
     setPending(true);
+    const author = authorName.trim();
     try {
       const run = await createReview({
         source,
         rawText: trimmed,
         ...(rating !== null ? { rating } : {}),
+        ...(author !== '' ? { authorName: author } : {}),
       });
-      setScreen({ kind: 'pipeline', run, reviewText: trimmed, source });
+      setScreen({
+        kind: 'pipeline',
+        run,
+        reviewText: trimmed,
+        source,
+        rating,
+        authorName: author !== '' ? author : null,
+      });
     } catch (err) {
       if (isApiError(err) && err.code === 'LIMIT_EXCEEDED') {
         router.push('/app/upgrade');
@@ -105,21 +126,34 @@ export function GeneratePage() {
         reviewId={screen.run.reviewId}
         generationId={screen.run.generationId}
         reviewText={screen.reviewText}
-        onDone={(payload) =>
+        onDone={(payload) => {
+          const createdAt = new Date().toISOString();
           setScreen({
             kind: 'result',
             payload,
             source: screen.source,
-            createdAt: new Date().toISOString(),
-          })
-        }
+            createdAt,
+            review: {
+              authorName: screen.authorName,
+              source: screen.source,
+              rating: screen.rating,
+              rawText: screen.reviewText,
+              createdAt,
+            },
+          });
+        }}
       />
     );
   }
 
   if (screen.kind === 'result') {
     return (
-      <ResultCards payload={screen.payload} source={screen.source} createdAt={screen.createdAt} />
+      <ResultCards
+        payload={screen.payload}
+        source={screen.source}
+        createdAt={screen.createdAt}
+        review={screen.review}
+      />
     );
   }
 
@@ -232,6 +266,23 @@ export function GeneratePage() {
               ))}
             </div>
             <p className="mt-1 text-13 text-ink-faint">{copy.genRatingHint}</p>
+          </div>
+
+          {/* Имя клиента (необязательно) */}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="author-name" className="text-13 font-medium text-ink-muted">
+              {copy.genAuthorLabel}
+            </label>
+            <input
+              id="author-name"
+              type="text"
+              value={authorName}
+              maxLength={AUTHOR_MAX}
+              placeholder={copy.genAuthorPlaceholder}
+              onChange={(e) => setAuthorName(e.target.value)}
+              className="mt-2 w-[260px] max-w-full rounded-md border border-line-strong bg-bg px-3.5 py-[7px] font-text text-14 leading-base text-ink transition-colors duration-[120ms] placeholder:text-ink-faint hover:border-ink-faint"
+            />
+            <p className="mt-1 text-13 text-ink-faint">{copy.genAuthorHint}</p>
           </div>
         </div>
 

@@ -48,6 +48,13 @@ export function ReviewDetail({ reviewId }: { reviewId: string }) {
         payload={payload}
         source={review.source}
         createdAt={review.createdAt}
+        review={{
+          authorName: review.authorName,
+          source: review.source,
+          rating: review.rating,
+          rawText: review.rawText,
+          createdAt: review.createdAt,
+        }}
         animate={livePayload !== null}
       />
     );

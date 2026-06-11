@@ -55,6 +55,7 @@ model Review {
   company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   source     ReviewSource
   rating     Int?         // 1..5
+  authorName String?      // имя клиента, до 100 символов (ADR-024)
   rawText    String       // до 4000 символов
   category   Category?
   severity   Int?
@@ -104,7 +105,8 @@ POST /company              { name, niche, toneOfVoice } → { company, accessTok
                            // (токен, выданный при регистрации, содержит companyId=null)
 PATCH /company/me          { name?, toneOfVoice? } → Company
 
-POST /reviews              { source, rating?, rawText } → 202 { reviewId, generationId }
+POST /reviews              { source, rating?, authorName?, rawText } → 202 { reviewId, generationId }
+                           // authorName — имя клиента, опционально, trim, ≤ 100 символов (ADR-024)
                            // в ОДНОЙ транзакции: атомарное резервирование лимита (инкремент
                            // UsageCounter) + создание Review + Generation(PENDING); затем job в BullMQ
                            // 402 LIMIT_EXCEEDED если лимит периода исчерпан
@@ -192,8 +194,11 @@ User = текст отзыва + рейтинг + источник.
 ```
 
 Главный экран `/app`: textarea (счётчик до 4000), селект источника, рейтинг звёздами,
+необязательное поле «Имя клиента» (authorName, ADR-024),
 кнопка генерации → POST /reviews → подписка на SSE → анимация пайплайна по статусам
-из MOTION.md → карточки появляются по готовности payload. SSE — fetch-based
+из MOTION.md → карточки появляются по готовности payload; над карточками — блок
+«Исходный отзыв» (имя клиента, бейдж площадки, оценка звёздами, дата, полный текст;
+общий компонент для экрана результата и /app/reviews/[id]). SSE — fetch-based
 (fetch + ReadableStream с заголовком Authorization; нативный EventSource не умеет
 заголовки — не использовать, токен в query запрещён). При FAILED — понятное сообщение
 и кнопка «Повторить» (POST /reviews/:id/retry). Копирование через

@@ -66,17 +66,40 @@ describe('ReviewsService.create — POST /reviews', () => {
 
     const result = await service.create(COMPANY_ID, {
       source: 'YANDEX_MAPS',
+      authorName: 'Анна',
       rawText: 'Текст отзыва',
     });
 
     expect(result).toEqual({ reviewId: 'review-1', generationId: 'gen-1' });
     expect(usage.reserve).toHaveBeenCalledWith(tx, COMPANY_ID, 'FREE', PERIOD);
+    expect(tx.review.create).toHaveBeenCalledWith({
+      data: {
+        companyId: COMPANY_ID,
+        source: 'YANDEX_MAPS',
+        rating: null,
+        authorName: 'Анна',
+        rawText: 'Текст отзыва',
+      },
+    });
     expect(tx.generation.create).toHaveBeenCalledWith({ data: { reviewId: 'review-1' } });
     expect(queue.enqueue).toHaveBeenCalledWith({
       generationId: 'gen-1',
       reviewId: 'review-1',
       companyId: COMPANY_ID,
       period: PERIOD,
+    });
+  });
+
+  it('authorName не передан → в Review сохраняется null', async () => {
+    const { service, tx } = setup();
+    tx.company.findUnique.mockResolvedValue({ id: COMPANY_ID, plan: 'FREE' });
+    tx.review.create.mockResolvedValue({ id: 'review-1' });
+    tx.generation.create.mockResolvedValue({ id: 'gen-1' });
+
+    await service.create(COMPANY_ID, { source: 'OTHER', rawText: 'Текст' });
+
+    expect(tx.review.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ authorName: null }),
     });
   });
 
