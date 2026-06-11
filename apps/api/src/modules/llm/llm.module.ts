@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Env } from '../../config/env';
 import { AnthropicProvider } from './anthropic.provider';
+import { ClaudeCliProvider } from './claude-cli.provider';
 import { FakeLlmProvider } from './fake-llm.provider';
 import { LLM_PROVIDER, LlmProvider } from './llm.types';
 
@@ -15,8 +16,12 @@ import { LLM_PROVIDER, LlmProvider } from './llm.types';
       provide: LLM_PROVIDER,
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>): LlmProvider => {
-        if (config.get('LLM_PROVIDER', { infer: true }) === 'fake') {
+        const provider = config.get('LLM_PROVIDER', { infer: true });
+        if (provider === 'fake') {
           return new FakeLlmProvider();
+        }
+        if (provider === 'claude-cli') {
+          return new ClaudeCliProvider(config.get('CLAUDE_CLI_MODEL', { infer: true }));
         }
         const apiKey = config.get('ANTHROPIC_API_KEY', { infer: true });
         if (!apiKey) {

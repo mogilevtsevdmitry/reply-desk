@@ -22,10 +22,13 @@ export const EnvSchema = z.object({
   LIMIT_BUSINESS: z.coerce.number().int().positive().default(1000),
 
   // --- AI-слой и конвейер генерации (задача 2.2) ---
-  // fake — детерминированный FakeLlmProvider без сети (dev/QA, ADR-019)
-  LLM_PROVIDER: z.enum(['anthropic', 'fake']).default('anthropic'),
+  // fake — детерминированный FakeLlmProvider без сети (dev/QA, ADR-019);
+  // claude-cli — локальный Claude Code CLI по подписке, dev-only (ADR-031)
+  LLM_PROVIDER: z.enum(['anthropic', 'fake', 'claude-cli']).default('anthropic'),
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-5'),
+  // Модель для LLM_PROVIDER=claude-cli (алиасы CLI: sonnet | opus | haiku)
+  CLAUDE_CLI_MODEL: z.string().default('sonnet'),
   // Порог pg_trgm-похожести кандидатов (ADR-001)
   SIMILARITY_THRESHOLD: z.coerce.number().min(0).max(1).default(0.3),
   // Запускать ли BullMQ-воркер внутри процесса API (ADR-020):
