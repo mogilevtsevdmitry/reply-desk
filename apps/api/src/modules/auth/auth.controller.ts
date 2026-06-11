@@ -18,9 +18,20 @@ import { AuthService, IssuedTokens } from './auth.service';
 
 export const REFRESH_COOKIE = 'rd_refresh';
 
-/** /auth/* — усиленный rate limit: 10 req/min (остальное API — 60 req/min). */
+/**
+ * /auth/* — усиленный rate limit.
+ * Дефолт: 10 req/60s. Переопределяется через THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS
+ * для E2E-окружения (ADR-025).
+ */
+const AUTH_THROTTLE_LIMIT = process.env.THROTTLE_AUTH_LIMIT
+  ? parseInt(process.env.THROTTLE_AUTH_LIMIT, 10)
+  : 10;
+const AUTH_THROTTLE_TTL = process.env.THROTTLE_AUTH_TTL_MS
+  ? parseInt(process.env.THROTTLE_AUTH_TTL_MS, 10)
+  : 60_000;
+
 @Public()
-@Throttle({ default: { limit: 10, ttl: 60_000 } })
+@Throttle({ default: { limit: AUTH_THROTTLE_LIMIT, ttl: AUTH_THROTTLE_TTL } })
 @Controller('auth')
 export class AuthController {
   constructor(

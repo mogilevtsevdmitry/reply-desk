@@ -36,6 +36,14 @@ export const EnvSchema = z.object({
     .transform((v) => v === 'true'),
   // Путь к папке промптов; по умолчанию prompts/ ищется вверх от cwd/__dirname
   PROMPTS_DIR: z.string().optional(),
+
+  // --- Rate limiting (@nestjs/throttler) ---
+  // Глобальный лимит (req/ttl): дефолт 60 req/60s
+  THROTTLE_DEFAULT_LIMIT: z.coerce.number().int().positive().default(60),
+  THROTTLE_DEFAULT_TTL_MS: z.coerce.number().int().positive().default(60_000),
+  // Auth-лимит (/auth/*): дефолт 10 req/60s
+  THROTTLE_AUTH_LIMIT: z.coerce.number().int().positive().default(10),
+  THROTTLE_AUTH_TTL_MS: z.coerce.number().int().positive().default(60_000),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

@@ -75,8 +75,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const setSession = useCallback((accessToken: string, knownEmail?: string) => {
-    if (knownEmail) setEmail(knownEmail);
+    if (knownEmail) {
+      setEmail(knownEmail);
+      // Persist email so it survives session restoration via rd_refresh cookie
+      try { localStorage.setItem('rd_email', knownEmail); } catch { /* ignore */ }
+    }
     setAccessToken(accessToken);
+  }, []);
+
+  // Restore email from localStorage on bootstrap (session via refresh cookie)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('rd_email');
+      if (stored) setEmail(stored);
+    } catch { /* ignore */ }
   }, []);
 
   const logout = useCallback(async () => {
@@ -87,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setAccessToken(null);
     setEmail(null);
+    try { localStorage.removeItem('rd_email'); } catch { /* ignore */ }
     queryClient.clear();
     router.replace('/login');
   }, [queryClient, router]);

@@ -7,7 +7,8 @@
     "dev": "next dev --port 3000",
     "start": "next start",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@replydesk/contracts": "workspace:*",
@@ -18,6 +19,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@replydesk/config": "workspace:*",
     "@tailwindcss/postcss": "^4.1.0",
     "@types/node": "^22.15.0",

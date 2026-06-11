@@ -42,8 +42,21 @@ import { RedisModule } from './redis/redis.module';
         signOptions: { expiresIn: config.get('JWT_ACCESS_TTL', { infer: true }) },
       }),
     }),
-    // Базовый rate limit 60 req/min; /auth/* ужесточён до 10 req/min в AuthController.
-    ThrottlerModule.forRoot({ throttlers: [{ name: 'default', ttl: 60_000, limit: 60 }] }),
+    // Базовый rate limit; /auth/* ужесточён в AuthController.
+    // Значения настраиваются через THROTTLE_DEFAULT_LIMIT / THROTTLE_AUTH_LIMIT
+    // (env-переопределение для E2E-окружения, ADR-025).
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Env, true>) => ({
+        throttlers: [
+          {
+            name: 'default',
+            ttl: config.get('THROTTLE_DEFAULT_TTL_MS', { infer: true }),
+            limit: config.get('THROTTLE_DEFAULT_LIMIT', { infer: true }),
+          },
+        ],
+      }),
+    }),
     PrismaModule,
     RedisModule,
     AuthModule,
