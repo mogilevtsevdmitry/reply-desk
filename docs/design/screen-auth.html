@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReplyDesk — вход</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prata&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: var(--bg); color: var(--ink);
+    font-family: var(--font-text); font-size: var(--fs-16); line-height: var(--lh-base);
+    display: grid; grid-template-columns: 1fr 1fr;
+  }
+  :focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-radius: var(--r-sm); }
+
+  /* ---------- Левая панель: бренд ---------- */
+  .brand-pane {
+    position: relative; overflow: hidden;
+    background:
+      radial-gradient(1200px 600px at -10% 110%, rgba(94, 174, 199, 0.08), transparent 60%),
+      var(--c-graphite);
+    border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: var(--sp-7);
+  }
+  .logo { font-family: var(--font-display); font-size: var(--fs-22); letter-spacing: 0.02em; }
+  .logo b { color: var(--accent); font-weight: var(--fw-regular); }
+  .brand-claim h1 {
+    font-family: var(--font-display); font-weight: var(--fw-regular);
+    font-size: var(--fs-36); line-height: var(--lh-tight); margin: 0 0 var(--sp-4); max-width: 18ch;
+  }
+  .brand-claim p { color: var(--ink-muted); max-width: 42ch; margin: 0; }
+  /* Декоративная «гребёнка» — фирменный след сейсмографа */
+  .brand-comb { display: flex; align-items: flex-end; gap: 6px; height: 48px; margin-bottom: var(--sp-5); }
+  .brand-comb i { width: 6px; border-radius: 3px; }
+  .brand-comb i:nth-child(1) { height: 12px; background: var(--sev-1); }
+  .brand-comb i:nth-child(2) { height: 22px; background: var(--sev-2); }
+  .brand-comb i:nth-child(3) { height: 30px; background: var(--sev-3); }
+  .brand-comb i:nth-child(4) { height: 40px; background: var(--sev-4); }
+  .brand-comb i:nth-child(5) { height: 48px; background: var(--sev-5); }
+  .brand-foot { color: var(--ink-faint); font-size: var(--fs-13); }
+
+  /* ---------- Правая панель: форма ---------- */
+  .form-pane { display: flex; align-items: center; justify-content: center; padding: var(--sp-6) var(--sp-5); }
+  .auth-card { width: 100%; max-width: 400px; }
+  .tabs { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px; margin-bottom: var(--sp-5); }
+  .tab {
+    flex: 1; font-family: var(--font-text); font-size: var(--fs-14); font-weight: var(--fw-medium);
+    color: var(--ink-muted); background: transparent; border: 0; cursor: pointer;
+    padding: 9px 16px; border-radius: var(--r-sm);
+    transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+  }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected="true"] { background: var(--surface-2); color: var(--ink); box-shadow: var(--shadow-1); }
+
+  form h2 { font-family: var(--font-display); font-weight: var(--fw-regular); font-size: var(--fs-28); line-height: var(--lh-tight); margin: 0 0 var(--sp-2); }
+  .form-sub { color: var(--ink-muted); font-size: var(--fs-14); margin: 0 0 var(--sp-5); }
+  .field { display: flex; flex-direction: column; gap: var(--sp-1); margin-bottom: var(--sp-4); }
+  .field label { font-size: var(--fs-13); font-weight: var(--fw-medium); color: var(--ink-muted); }
+  .input {
+    font-family: var(--font-text); font-size: var(--fs-16); color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line-strong);
+    border-radius: var(--r-md); padding: 11px 14px; width: 100%;
+    transition: border-color var(--t-fast) var(--ease-out);
+  }
+  .input::placeholder { color: var(--ink-faint); }
+  .input:hover { border-color: var(--ink-faint); }
+  .input:focus-visible { outline: var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
+  .hint { font-size: var(--fs-13); color: var(--ink-faint); margin-top: var(--sp-1); }
+
+  .btn {
+    width: 100%; font-family: var(--font-text); font-size: var(--fs-14); font-weight: var(--fw-medium);
+    line-height: 1; padding: 13px 20px; border-radius: var(--r-md);
+    border: 1px solid transparent; cursor: pointer;
+    background: var(--accent); color: var(--ink-on-accent);
+    transition: background var(--t-fast) var(--ease-out);
+  }
+  .btn:hover { background: var(--accent-hover); }
+  .btn:active { background: var(--accent-down); }
+  .form-foot { margin-top: var(--sp-4); font-size: var(--fs-13); color: var(--ink-muted); }
+  .form-foot a { color: var(--accent); text-decoration: none; }
+  .form-foot a:hover { text-decoration: underline; }
+  [hidden] { display: none !important; }
+
+  /* ---------- Адаптив 360px ---------- */
+  @media (max-width: 880px) {
+    body { grid-template-columns: 1fr; }
+    .brand-pane { border-right: 0; border-bottom: 1px solid var(--line); padding: var(--sp-5); gap: var(--sp-5); }
+    .brand-claim h1 { font-size: var(--fs-28); }
+    .brand-comb { height: 32px; margin-bottom: var(--sp-3); }
+    .brand-comb i:nth-child(1){height:8px} .brand-comb i:nth-child(2){height:14px}
+    .brand-comb i:nth-child(3){height:20px} .brand-comb i:nth-child(4){height:26px}
+    .brand-comb i:nth-child(5){height:32px}
+    .brand-foot { display: none; }
+    .form-pane { padding: var(--sp-5) var(--sp-4) var(--sp-7); }
+  }
+</style>
+</head>
+<body>
+  <aside class="brand-pane">
+    <div class="logo">Reply<b>Desk</b></div>
+    <div class="brand-claim">
+      <div class="brand-comb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <h1>Пульт управления репутацией</h1>
+      <p>Вставьте отзыв клиента — через восемь секунд у вас готовый ответ для площадки, задача для команды и план возврата клиента.</p>
+    </div>
+    <div class="brand-foot">Яндекс.Карты · 2ГИС · Ozon · Wildberries</div>
+  </aside>
+
+  <main class="form-pane">
+    <div class="auth-card">
+      <div class="tabs" role="tablist" aria-label="Вход или регистрация">
+        <button class="tab" id="tab-login" role="tab" aria-selected="true" aria-controls="panel-login">Вход</button>
+        <button class="tab" id="tab-signup" role="tab" aria-selected="false" aria-controls="panel-signup">Регистрация</button>
+      </div>
+
+      <form id="panel-login" role="tabpanel" aria-labelledby="tab-login">
+        <h2>С возвращением</h2>
+        <p class="form-sub">Войдите, чтобы продолжить работу с отзывами</p>
+        <div class="field">
+          <label for="login-email">Электронная почта</label>
+          <input class="input" id="login-email" type="email" autocomplete="email" placeholder="name@company.ru">
+        </div>
+        <div class="field">
+          <label for="login-pass">Пароль</label>
+          <input class="input" id="login-pass" type="password" autocomplete="current-password" placeholder="••••••••">
+        </div>
+        <button class="btn" type="submit">Войти в пульт</button>
+        <p class="form-foot">Нет аккаунта? <a href="#" data-switch="signup">Создайте за минуту</a></p>
+      </form>
+
+      <form id="panel-signup" role="tabpanel" aria-labelledby="tab-signup" hidden>
+        <h2>Создайте аккаунт</h2>
+        <p class="form-sub">Бесплатный тариф — 10 генераций в месяц, без карты</p>
+        <div class="field">
+          <label for="su-email">Электронная почта</label>
+          <input class="input" id="su-email" type="email" autocomplete="email" placeholder="name@company.ru">
+        </div>
+        <div class="field">
+          <label for="su-pass">Пароль</label>
+          <input class="input" id="su-pass" type="password" autocomplete="new-password" placeholder="Минимум 8 символов">
+          <p class="hint">Используйте буквы и цифры — так надёжнее</p>
+        </div>
+        <button class="btn" type="submit">Создать аккаунт</button>
+        <p class="form-foot">Уже зарегистрированы? <a href="#" data-switch="login">Войдите</a></p>
+      </form>
+    </div>
+  </main>
+
+<script>
+  // Демонстрация переключения табов (в проде — роутинг Next.js)
+  const tabs = { login: document.getElementById('tab-login'), signup: document.getElementById('tab-signup') };
+  const panels = { login: document.getElementById('panel-login'), signup: document.getElementById('panel-signup') };
+  function show(name) {
+    for (const k of Object.keys(tabs)) {
+      tabs[k].setAttribute('aria-selected', String(k === name));
+      panels[k].hidden = k !== name;
+    }
+  }
+  tabs.login.addEventListener('click', () => show('login'));
+  tabs.signup.addEventListener('click', () => show('signup'));
+  document.querySelectorAll('[data-switch]').forEach(a =>
+    a.addEventListener('click', e => { e.preventDefault(); show(a.dataset.switch); }));
+  document.querySelectorAll('form').forEach(f => f.addEventListener('submit', e => e.preventDefault()));
+</script>
+</body>
+</html>

@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReplyDesk — настройка компании</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prata&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: var(--bg); color: var(--ink);
+    font-family: var(--font-text); font-size: var(--fs-16); line-height: var(--lh-base);
+    display: flex; flex-direction: column; align-items: center;
+    padding: var(--sp-6) var(--sp-4) var(--sp-8);
+  }
+  :focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-radius: var(--r-sm); }
+  .logo { font-family: var(--font-display); font-size: var(--fs-18); margin-bottom: var(--sp-7); }
+  .logo b { color: var(--accent); font-weight: var(--fw-regular); }
+
+  .wizard { width: 100%; max-width: 560px; }
+
+  /* ---------- Степпер ---------- */
+  .stepper { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-6); }
+  .step { display: flex; align-items: center; gap: var(--sp-2); color: var(--ink-faint); font-size: var(--fs-13); }
+  .step .dot {
+    width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+    border: 1px solid var(--line-strong); font-family: var(--font-display); font-size: var(--fs-13);
+    transition: background var(--t-base) var(--ease-out), color var(--t-base) var(--ease-out), border-color var(--t-base) var(--ease-out);
+  }
+  .step.is-current { color: var(--ink); }
+  .step.is-current .dot { border-color: var(--accent); color: var(--accent); box-shadow: var(--glow-accent); }
+  .step.is-done .dot { background: var(--accent); border-color: var(--accent); color: var(--ink-on-accent); }
+  .step-line { flex: 1; height: 1px; background: var(--line); }
+  .step-name { display: none; }
+  @media (min-width: 720px) { .step-name { display: inline; } }
+
+  h1 { font-family: var(--font-display); font-weight: var(--fw-regular); font-size: var(--fs-28); line-height: var(--lh-tight); margin: 0 0 var(--sp-2); }
+  .sub { color: var(--ink-muted); font-size: var(--fs-14); margin: 0 0 var(--sp-5); }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-5); box-shadow: var(--shadow-2); }
+  [hidden] { display: none !important; }
+
+  .field { display: flex; flex-direction: column; gap: var(--sp-1); margin-bottom: var(--sp-4); }
+  .field label, .group-label { font-size: var(--fs-13); font-weight: var(--fw-medium); color: var(--ink-muted); }
+  .input, .textarea {
+    font-family: var(--font-text); font-size: var(--fs-16); color: var(--ink);
+    background: var(--bg); border: 1px solid var(--line-strong);
+    border-radius: var(--r-md); padding: 11px 14px; width: 100%;
+    transition: border-color var(--t-fast) var(--ease-out);
+  }
+  .input::placeholder, .textarea::placeholder { color: var(--ink-faint); }
+  .input:hover, .textarea:hover { border-color: var(--ink-faint); }
+  .input:focus-visible, .textarea:focus-visible { outline: var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
+  .textarea { resize: vertical; min-height: 110px; }
+  .hint { font-size: var(--fs-13); color: var(--ink-faint); margin-top: var(--sp-1); }
+
+  /* Ниши — чипы */
+  .chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
+  .chip { position: relative; }
+  .chip input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .chip span {
+    display: inline-block; padding: 8px 14px; border-radius: var(--r-pill);
+    border: 1px solid var(--line-strong); color: var(--ink-muted); font-size: var(--fs-14);
+    transition: all var(--t-fast) var(--ease-out);
+  }
+  .chip input:hover + span { border-color: var(--ink-faint); color: var(--ink); }
+  .chip input:checked + span { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .chip input:focus-visible + span { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+  /* Тон бренда — радио-карты */
+  .tone-cards { display: grid; gap: var(--sp-3); margin-top: var(--sp-2); }
+  .tone-card { position: relative; }
+  .tone-card input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .tone-card .tc-body {
+    border: 1px solid var(--line-strong); border-radius: var(--r-md); padding: var(--sp-4);
+    transition: border-color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
+  }
+  .tone-card input:hover + .tc-body { border-color: var(--ink-faint); }
+  .tone-card input:checked + .tc-body { border-color: var(--accent); background: var(--accent-dim); }
+  .tone-card input:focus-visible + .tc-body { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+  .tc-body b { display: block; font-weight: var(--fw-semibold); font-size: var(--fs-14); margin-bottom: 2px; }
+  .tc-body span { font-size: var(--fs-13); color: var(--ink-muted); }
+
+  /* Навигация шагов */
+  .wizard-nav { display: flex; justify-content: space-between; gap: var(--sp-3); margin-top: var(--sp-5); }
+  .btn {
+    font-family: var(--font-text); font-size: var(--fs-14); font-weight: var(--fw-medium);
+    line-height: 1; padding: 12px 20px; border-radius: var(--r-md);
+    border: 1px solid transparent; cursor: pointer;
+    transition: background var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+  }
+  .btn-primary { background: var(--accent); color: var(--ink-on-accent); }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-ghost { background: transparent; color: var(--ink-muted); }
+  .btn-ghost:hover { background: var(--surface-2); color: var(--ink); }
+  .btn-ghost[disabled] { visibility: hidden; }
+
+  /* Появление шага */
+  .panel-step { animation: rise var(--t-base) var(--ease-out); }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .panel-step { animation: none; } }
+</style>
+</head>
+<body>
+  <div class="logo">Reply<b>Desk</b></div>
+
+  <div class="wizard">
+    <div class="stepper" aria-label="Шаг настройки">
+      <div class="step is-current" data-step="1"><span class="dot">1</span><span class="step-name">Компания</span></div>
+      <div class="step-line"></div>
+      <div class="step" data-step="2"><span class="dot">2</span><span class="step-name">Тон бренда</span></div>
+      <div class="step-line"></div>
+      <div class="step" data-step="3"><span class="dot">3</span><span class="step-name">Примеры</span></div>
+    </div>
+
+    <!-- Шаг 1 -->
+    <section class="panel panel-step" id="step-1">
+      <h1>Расскажите о компании</h1>
+      <p class="sub">Эти данные попадут в каждый ответ — название и ниша задают контекст для AI</p>
+      <div class="field">
+        <label for="company">Название компании</label>
+        <input class="input" id="company" type="text" placeholder="Как вас знают клиенты, например «Салон Марины»">
+      </div>
+      <div class="field">
+        <span class="group-label" id="niche-label">Ниша</span>
+        <div class="chips" role="radiogroup" aria-labelledby="niche-label">
+          <label class="chip"><input type="radio" name="niche" checked><span>Салон красоты</span></label>
+          <label class="chip"><input type="radio" name="niche"><span>Стоматология</span></label>
+          <label class="chip"><input type="radio" name="niche"><span>Ресторан</span></label>
+          <label class="chip"><input type="radio" name="niche"><span>Автосервис</span></label>
+          <label class="chip"><input type="radio" name="niche"><span>Фитнес</span></label>
+          <label class="chip"><input type="radio" name="niche"><span>Другое</span></label>
+        </div>
+        <p class="hint">Ниша подключает отраслевые правила: что обещать клиенту, чего избегать в ответах</p>
+      </div>
+    </section>
+
+    <!-- Шаг 2 -->
+    <section class="panel panel-step" id="step-2" hidden>
+      <h1>Каким голосом отвечает бренд</h1>
+      <p class="sub">Тон применяется ко всем публичным ответам — его можно сменить в настройках</p>
+      <div class="field">
+        <span class="group-label" id="tone-label">Тон по умолчанию</span>
+        <div class="tone-cards" role="radiogroup" aria-labelledby="tone-label">
+          <label class="tone-card"><input type="radio" name="tone">
+            <span class="tc-body"><b>Мягкий</b><span>Сопереживаем, извиняемся первыми, предлагаем компенсацию: «нам очень жаль, что визит прошёл не так»</span></span>
+          </label>
+          <label class="tone-card"><input type="radio" name="tone" checked>
+            <span class="tc-body"><b>Нейтральный</b><span>Спокойно признаём факты и называем шаги: «разобрались в ситуации, вот что сделаем»</span></span>
+          </label>
+          <label class="tone-card"><input type="radio" name="tone">
+            <span class="tc-body"><b>Уверенный</b><span>Корректно отстаиваем позицию, когда претензия спорная: «проверили записи — расскажем, как было»</span></span>
+          </label>
+        </div>
+      </div>
+      <div class="field">
+        <label for="forbidden">Чего избегать в ответах (необязательно)</label>
+        <input class="input" id="forbidden" type="text" placeholder="Например: не обещать возврат денег без проверки">
+      </div>
+    </section>
+
+    <!-- Шаг 3 -->
+    <section class="panel panel-step" id="step-3" hidden>
+      <h1>Покажите, как вы пишете</h1>
+      <p class="sub">Вставьте один–три ваших ответа клиентам, которыми гордитесь. AI переймёт лексику и манеру</p>
+      <div class="field">
+        <label for="sample">Примеры текстов</label>
+        <textarea class="textarea" id="sample" placeholder="Например: «Анна, спасибо, что рассказали. Мастер Ольга уже знает о ситуации — приходите в четверг, поправим укладку за наш счёт»"></textarea>
+        <p class="hint">Можно пропустить — тогда AI будет опираться только на выбранный тон</p>
+      </div>
+    </section>
+
+    <div class="wizard-nav">
+      <button class="btn btn-ghost" id="back" disabled>Назад</button>
+      <button class="btn btn-primary" id="next">Продолжить</button>
+    </div>
+  </div>
+
+<script>
+  // Демонстрация шагов (в проде — состояние формы в Next.js)
+  let current = 1;
+  const total = 3;
+  const back = document.getElementById('back');
+  const next = document.getElementById('next');
+  function render() {
+    for (let i = 1; i <= total; i++) {
+      document.getElementById('step-' + i).hidden = i !== current;
+      const s = document.querySelector('.step[data-step="' + i + '"]');
+      s.classList.toggle('is-current', i === current);
+      s.classList.toggle('is-done', i < current);
+      if (i < current) s.querySelector('.dot').textContent = '✓';
+      else s.querySelector('.dot').textContent = i;
+    }
+    back.disabled = current === 1;
+    next.textContent = current === total ? 'Открыть пульт' : 'Продолжить';
+  }
+  next.addEventListener('click', () => { if (current < total) { current++; render(); } });
+  back.addEventListener('click', () => { if (current > 1) { current--; render(); } });
+  render();
+</script>
+</body>
+</html>

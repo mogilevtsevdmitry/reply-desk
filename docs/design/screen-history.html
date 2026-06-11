@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReplyDesk — история отзывов</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prata&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: var(--bg); color: var(--ink);
+    font-family: var(--font-text); font-size: var(--fs-16); line-height: var(--lh-base);
+    display: grid; grid-template-columns: 232px 1fr;
+  }
+  :focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-radius: var(--r-sm); }
+
+  /* ---------- Сайдбар (общий с generate) ---------- */
+  .side {
+    border-right: 1px solid var(--line); padding: var(--sp-5) var(--sp-4);
+    display: flex; flex-direction: column; gap: var(--sp-6);
+    position: sticky; top: 0; height: 100vh;
+  }
+  .logo { font-family: var(--font-display); font-size: var(--fs-18); }
+  .logo b { color: var(--accent); font-weight: var(--fw-regular); }
+  nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    display: block; padding: 10px 12px; border-radius: var(--r-md);
+    color: var(--ink-muted); text-decoration: none; font-size: var(--fs-14); font-weight: var(--fw-medium);
+    transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+  }
+  .nav-item:hover { background: var(--surface-2); color: var(--ink); }
+  .nav-item.is-active { background: var(--surface-2); color: var(--accent); }
+  .usage { margin-top: auto; font-size: var(--fs-13); color: var(--ink-muted); }
+  .usage .usage-num { font-family: var(--font-display); font-size: var(--fs-22); color: var(--ink); display: block; }
+  .usage-bar { height: 4px; border-radius: 2px; background: var(--line); margin-top: var(--sp-2); overflow: hidden; }
+  .usage-bar i { display: block; height: 100%; width: 70%; background: var(--accent); border-radius: 2px; }
+
+  .main { padding: var(--sp-6) var(--sp-6) var(--sp-8); max-width: 1040px; }
+  h1 { font-family: var(--font-display); font-weight: var(--fw-regular); font-size: var(--fs-36); line-height: var(--lh-tight); margin: 0 0 var(--sp-2); }
+  .sub { color: var(--ink-muted); font-size: var(--fs-14); margin: 0 0 var(--sp-5); }
+
+  /* ---------- Фильтры ---------- */
+  .filters { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: end; margin-bottom: var(--sp-5); }
+  .filter { display: flex; flex-direction: column; gap: var(--sp-1); }
+  .filter label { font-size: var(--fs-12); font-weight: var(--fw-medium); color: var(--ink-faint); letter-spacing: var(--ls-caps); text-transform: uppercase; }
+  .select, .input-date {
+    font-family: var(--font-text); font-size: var(--fs-14); color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-md);
+    padding: 9px 12px; min-width: 150px;
+    transition: border-color var(--t-fast) var(--ease-out);
+  }
+  .select:hover, .input-date:hover { border-color: var(--ink-faint); }
+  .select:focus-visible, .input-date:focus-visible { outline: var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
+  .input-date { color-scheme: dark; }
+  .btn-ghost {
+    font-family: var(--font-text); font-size: var(--fs-14); font-weight: var(--fw-medium);
+    background: transparent; color: var(--ink-muted); border: 0; border-radius: var(--r-md);
+    padding: 10px 14px; cursor: pointer; transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+  }
+  .btn-ghost:hover { background: var(--surface-2); color: var(--ink); }
+
+  /* ---------- Список ---------- */
+  .list { display: flex; flex-direction: column; gap: var(--sp-3); }
+  .row {
+    display: grid; grid-template-columns: auto 1fr auto; gap: var(--sp-4); align-items: center;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+    padding: var(--sp-4) var(--sp-5); text-decoration: none; color: inherit;
+    transition: border-color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
+  }
+  .row:hover { border-color: var(--line-strong); background: var(--surface-2); }
+  .row-main { min-width: 0; }
+  .row-top { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); align-items: center; margin-bottom: var(--sp-1); font-size: var(--fs-13); color: var(--ink-muted); }
+  .row-text { margin: 0; font-size: var(--fs-14); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-date { font-size: var(--fs-13); color: var(--ink-faint); white-space: nowrap; }
+  .row.is-failed { border-style: dashed; }
+  .status-failed { color: var(--sev-4); font-weight: var(--fw-medium); }
+
+  .src { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-13); font-weight: var(--fw-medium); color: var(--ink-muted); }
+  .src::before { content: ""; width: 8px; height: 8px; border-radius: 50%; }
+  .src-yandex::before { background: #f5523a; }
+  .src-2gis::before  { background: #55b04f; }
+  .src-ozon::before  { background: #4f7df5; }
+  .src-wb::before    { background: #b65ad4; }
+  .cat { font-size: var(--fs-13); color: var(--ink-muted); }
+  .cat::before { content: "·"; margin-right: var(--sp-2); color: var(--ink-faint); }
+
+  /* Severity-гребёнка */
+  .sev { display: inline-flex; align-items: center; gap: var(--sp-2); }
+  .sev-comb { display: inline-flex; align-items: flex-end; gap: 3px; height: 22px; }
+  .sev-comb i { width: 4px; border-radius: 2px; background: var(--line-strong); }
+  .sev-comb i:nth-child(1){height:6px} .sev-comb i:nth-child(2){height:10px}
+  .sev-comb i:nth-child(3){height:14px} .sev-comb i:nth-child(4){height:18px} .sev-comb i:nth-child(5){height:22px}
+  .sev[data-level="1"] { --sev-color: var(--sev-1); } .sev[data-level="1"] .sev-comb i:nth-child(-n+1) { background: var(--sev-color); }
+  .sev[data-level="2"] { --sev-color: var(--sev-2); } .sev[data-level="2"] .sev-comb i:nth-child(-n+2) { background: var(--sev-color); }
+  .sev[data-level="3"] { --sev-color: var(--sev-3); } .sev[data-level="3"] .sev-comb i:nth-child(-n+3) { background: var(--sev-color); }
+  .sev[data-level="4"] { --sev-color: var(--sev-4); } .sev[data-level="4"] .sev-comb i:nth-child(-n+4) { background: var(--sev-color); }
+  .sev[data-level="5"] { --sev-color: var(--sev-5); } .sev[data-level="5"] .sev-comb i:nth-child(-n+5) { background: var(--sev-color); }
+  .sev .sev-num { font-family: var(--font-display); font-size: var(--fs-16); color: var(--sev-color); }
+
+  .list-foot { display: flex; justify-content: space-between; align-items: center; margin-top: var(--sp-5); font-size: var(--fs-13); color: var(--ink-faint); }
+
+  /* ---------- Адаптив ---------- */
+  @media (max-width: 880px) {
+    body { grid-template-columns: 1fr; }
+    .side { position: static; height: auto; flex-direction: row; align-items: center; gap: var(--sp-4); border-right: 0; border-bottom: 1px solid var(--line); padding: var(--sp-3) var(--sp-4); }
+    nav { flex-direction: row; gap: 2px; }
+    .nav-item { padding: 8px 10px; font-size: var(--fs-13); }
+    .usage { margin: 0 0 0 auto; text-align: right; }
+    .usage .usage-num { font-size: var(--fs-16); display: inline; margin-right: 4px; }
+    .usage-bar, .usage-label { display: none; }
+    .main { padding: var(--sp-5) var(--sp-4) var(--sp-7); }
+    h1 { font-size: var(--fs-28); }
+    .filters .select, .filters .input-date { min-width: 0; width: 100%; }
+    .filter { flex: 1 1 45%; }
+    .row { grid-template-columns: 1fr; gap: var(--sp-2); }
+    .row-text { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .row .sev { order: 3; }
+  }
+</style>
+</head>
+<body>
+  <aside class="side">
+    <div class="logo">Reply<b>Desk</b></div>
+    <nav aria-label="Основные разделы">
+      <a class="nav-item" href="screen-generate.html">Генерация</a>
+      <a class="nav-item is-active" href="#" aria-current="page">История</a>
+      <a class="nav-item" href="screen-settings.html">Настройки</a>
+    </nav>
+    <div class="usage">
+      <span class="usage-num">7 из 10</span>
+      <span class="usage-label">генераций в июне, тариф Free</span>
+      <div class="usage-bar" aria-hidden="true"><i></i></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <h1>История отзывов</h1>
+    <p class="sub">Все обработанные отзывы компании — 14 за последние 30 дней</p>
+
+    <form class="filters">
+      <div class="filter">
+        <label for="f-src">Площадка</label>
+        <select class="select" id="f-src">
+          <option>Все площадки</option>
+          <option>Яндекс.Карты</option>
+          <option>2ГИС</option>
+          <option>Ozon</option>
+          <option>Wildberries</option>
+        </select>
+      </div>
+      <div class="filter">
+        <label for="f-cat">Категория</label>
+        <select class="select" id="f-cat">
+          <option>Все категории</option>
+          <option>Сервис</option>
+          <option>Качество</option>
+          <option>Персонал</option>
+          <option>Цена</option>
+          <option>Ожидание</option>
+        </select>
+      </div>
+      <div class="filter">
+        <label for="f-sev">Серьёзность</label>
+        <select class="select" id="f-sev">
+          <option>Любая</option>
+          <option>5 — критичная</option>
+          <option>4 — серьёзная</option>
+          <option>3 — заметная</option>
+          <option>2 — лёгкая</option>
+          <option>1 — фоновая</option>
+        </select>
+      </div>
+      <div class="filter">
+        <label for="f-from">Период с</label>
+        <input class="input-date" id="f-from" type="date" value="2026-05-12">
+      </div>
+      <div class="filter">
+        <label for="f-to">по</label>
+        <input class="input-date" id="f-to" type="date" value="2026-06-11">
+      </div>
+      <button class="btn-ghost" type="reset">Сбросить</button>
+    </form>
+
+    <div class="list">
+      <a class="row" href="screen-generate.html">
+        <span class="sev" data-level="4" aria-label="Серьёзность 4 из 5">
+          <span class="sev-comb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="sev-num">4</span>
+        </span>
+        <div class="row-main">
+          <div class="row-top"><span class="src src-yandex">Яндекс.Карты</span><span class="cat">Качество</span></div>
+          <p class="row-text">Записывалась на окрашивание к 14:00, в итоге прождала сорок минут, пока мастер освободится…</p>
+        </div>
+        <span class="row-date">11 июня</span>
+      </a>
+
+      <a class="row is-failed" href="screen-generate.html">
+        <span class="sev" data-level="0" aria-hidden="true">
+          <span class="sev-comb"><i></i><i></i><i></i><i></i><i></i></span>
+        </span>
+        <div class="row-main">
+          <div class="row-top"><span class="src src-2gis">2ГИС</span><span class="status-failed">генерация не удалась — можно повторить</span></div>
+          <p class="row-text">Не дозвонилась до администратора два дня подряд, запись через сайт тоже не работает…</p>
+        </div>
+        <span class="row-date">9 июня</span>
+      </a>
+
+      <a class="row" href="screen-generate.html">
+        <span class="sev" data-level="5" aria-label="Серьёзность 5 из 5">
+          <span class="sev-comb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="sev-num">5</span>
+        </span>
+        <div class="row-main">
+          <div class="row-top"><span class="src src-yandex">Яндекс.Карты</span><span class="cat">Персонал</span></div>
+          <p class="row-text">Мастер во время процедуры обсуждала других клиентов по именам, а на просьбу прекратить нагрубила…</p>
+        </div>
+        <span class="row-date">5 июня</span>
+      </a>
+
+      <a class="row" href="screen-generate.html">
+        <span class="sev" data-level="3" aria-label="Серьёзность 3 из 5">
+          <span class="sev-comb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="sev-num">3</span>
+        </span>
+        <div class="row-main">
+          <div class="row-top"><span class="src src-ozon">Ozon</span><span class="cat">Ожидание</span></div>
+          <p class="row-text">Заказ собирали неделю вместо заявленных двух дней, на сообщения отвечали через раз…</p>
+        </div>
+        <span class="row-date">2 июня</span>
+      </a>
+
+      <a class="row" href="screen-generate.html">
+        <span class="sev" data-level="2" aria-label="Серьёзность 2 из 5">
+          <span class="sev-comb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="sev-num">2</span>
+        </span>
+        <div class="row-main">
+          <div class="row-top"><span class="src src-wb">Wildberries</span><span class="cat">Цена</span></div>
+          <p class="row-text">Хороший шампунь, но за эти деньги ожидала объём побольше. В остальном всё устроило, беру не первый раз…</p>
+        </div>
+        <span class="row-date">29 мая</span>
+      </a>
+
+      <a class="row" href="screen-generate.html">
+        <span class="sev" data-level="3" aria-label="Серьёзность 3 из 5">
+          <span class="sev-comb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="sev-num">3</span>
+        </span>
+        <div class="row-main">
+          <div class="row-top"><span class="src src-yandex">Яндекс.Карты</span><span class="cat">Ожидание</span></div>
+          <p class="row-text">Пришла вовремя, но просидела в зоне ожидания полчаса. Кофе предложили, но времени жалко…</p>
+        </div>
+        <span class="row-date">28 мая</span>
+      </a>
+
+      <a class="row" href="screen-generate.html">
+        <span class="sev" data-level="1" aria-label="Серьёзность 1 из 5">
+          <span class="sev-comb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="sev-num">1</span>
+        </span>
+        <div class="row-main">
+          <div class="row-top"><span class="src src-2gis">2ГИС</span><span class="cat">Сервис</span></div>
+          <p class="row-text">Всё отлично, единственное — хотелось бы напоминание о записи не за час, а за день…</p>
+        </div>
+        <span class="row-date">21 мая</span>
+      </a>
+    </div>
+
+    <div class="list-foot">
+      <span>Показаны 7 из 14</span>
+      <button class="btn-ghost" type="button">Показать ещё</button>
+    </div>
+  </main>
+</body>
+</html>

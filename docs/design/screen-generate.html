@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReplyDesk — генерация</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prata&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: var(--bg); color: var(--ink);
+    font-family: var(--font-text); font-size: var(--fs-16); line-height: var(--lh-base);
+    display: grid; grid-template-columns: 232px 1fr;
+  }
+  :focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-radius: var(--r-sm); }
+  [hidden] { display: none !important; }
+
+  /* ================= Сайдбар ================= */
+  .side {
+    border-right: 1px solid var(--line); padding: var(--sp-5) var(--sp-4);
+    display: flex; flex-direction: column; gap: var(--sp-6);
+    position: sticky; top: 0; height: 100vh;
+  }
+  .logo { font-family: var(--font-display); font-size: var(--fs-18); }
+  .logo b { color: var(--accent); font-weight: var(--fw-regular); }
+  nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    display: block; padding: 10px 12px; border-radius: var(--r-md);
+    color: var(--ink-muted); text-decoration: none; font-size: var(--fs-14); font-weight: var(--fw-medium);
+    transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+  }
+  .nav-item:hover { background: var(--surface-2); color: var(--ink); }
+  .nav-item.is-active { background: var(--surface-2); color: var(--accent); }
+  .usage { margin-top: auto; font-size: var(--fs-13); color: var(--ink-muted); }
+  .usage .usage-num { font-family: var(--font-display); font-size: var(--fs-22); color: var(--ink); display: block; }
+  .usage-bar { height: 4px; border-radius: 2px; background: var(--line); margin-top: var(--sp-2); overflow: hidden; }
+  .usage-bar i { display: block; height: 100%; width: 70%; background: var(--accent); border-radius: 2px; }
+
+  /* ================= Контент ================= */
+  .main { padding: var(--sp-6) var(--sp-6) var(--sp-8); max-width: 1040px; }
+  h1 { font-family: var(--font-display); font-weight: var(--fw-regular); font-size: var(--fs-36); line-height: var(--lh-tight); margin: 0 0 var(--sp-2); }
+  .sub { color: var(--ink-muted); font-size: var(--fs-14); margin: 0 0 var(--sp-6); }
+
+  /* ---------- Форма отзыва ---------- */
+  .compose { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-5); box-shadow: var(--shadow-2); }
+  .field { display: flex; flex-direction: column; gap: var(--sp-1); margin-bottom: var(--sp-4); }
+  .field label, .group-label { font-size: var(--fs-13); font-weight: var(--fw-medium); color: var(--ink-muted); }
+  .textarea {
+    font-family: var(--font-text); font-size: var(--fs-16); color: var(--ink);
+    background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--r-md);
+    padding: 12px 14px; width: 100%; resize: vertical; min-height: 140px; line-height: var(--lh-base);
+    transition: border-color var(--t-fast) var(--ease-out);
+  }
+  .textarea::placeholder { color: var(--ink-faint); }
+  .textarea:hover { border-color: var(--ink-faint); }
+  .textarea:focus-visible { outline: var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
+  .compose-row { display: flex; flex-wrap: wrap; gap: var(--sp-5); margin-bottom: var(--sp-5); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
+  .chip { position: relative; }
+  .chip input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .chip span {
+    display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px 7px 9px; border-radius: var(--r-pill);
+    border: 1px solid var(--line-strong); color: var(--ink-muted); font-size: var(--fs-13); font-weight: var(--fw-medium);
+    transition: all var(--t-fast) var(--ease-out);
+  }
+  .chip span::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); }
+  .chip.src-yandex span::before { background: #f5523a; }
+  .chip.src-2gis span::before  { background: #55b04f; }
+  .chip.src-ozon span::before  { background: #4f7df5; }
+  .chip.src-wb span::before    { background: #b65ad4; }
+  .chip input:hover + span { border-color: var(--ink-faint); color: var(--ink); }
+  .chip input:checked + span { border-color: var(--accent); color: var(--ink); background: var(--accent-dim); }
+  .chip input:focus-visible + span { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+  .stars { display: inline-flex; gap: var(--sp-1); margin-top: var(--sp-2); }
+  .star { position: relative; }
+  .star input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .star span {
+    display: grid; place-items: center; width: 34px; height: 34px; border-radius: var(--r-md);
+    border: 1px solid var(--line-strong); color: var(--ink-muted); font-size: var(--fs-14);
+    transition: all var(--t-fast) var(--ease-out);
+  }
+  .star input:hover + span { border-color: var(--ink-faint); color: var(--ink); }
+  .star input:checked + span { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .star input:focus-visible + span { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+  .btn {
+    font-family: var(--font-text); font-size: var(--fs-14); font-weight: var(--fw-medium);
+    line-height: 1; padding: 13px 22px; border-radius: var(--r-md);
+    border: 1px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: var(--sp-2);
+    transition: background var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+  }
+  .btn-primary { background: var(--accent); color: var(--ink-on-accent); }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:active { background: var(--accent-down); }
+  .btn-secondary { background: transparent; color: var(--ink); border-color: var(--line-strong); }
+  .btn-secondary:hover { background: var(--surface-2); }
+  .btn-ghost { background: transparent; color: var(--ink-muted); }
+  .btn-ghost:hover { background: var(--surface-2); color: var(--ink); }
+  .compose-foot { display: flex; align-items: center; gap: var(--sp-4); flex-wrap: wrap; }
+  .compose-foot .left-note { font-size: var(--fs-13); color: var(--ink-faint); }
+
+  /* ================= Пайплайн (signature) ================= */
+  .pipeline { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-6) var(--sp-5); box-shadow: var(--shadow-2); }
+  .pl-review {
+    font-size: var(--fs-14); color: var(--ink-muted); border-left: 2px solid var(--line-strong);
+    padding-left: var(--sp-3); margin: 0 0 var(--sp-6); max-width: 64ch;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .rail { position: relative; display: flex; justify-content: space-between; margin: 0 var(--sp-2) var(--sp-4); }
+  .rail::before {
+    content: ""; position: absolute; left: 14px; right: 14px; top: 13px;
+    height: 2px; background: var(--line); border-radius: 1px;
+  }
+  .rail-fill {
+    position: absolute; left: 14px; top: 13px; height: 2px; width: 0;
+    background: var(--accent); border-radius: 1px;
+    transition: width var(--t-stage) linear;
+  }
+  .pl-node { position: relative; display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); width: 28px; }
+  .pl-dot {
+    width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--bg); border: 2px solid var(--line-strong);
+    transition: border-color var(--t-base) var(--ease-out), box-shadow var(--t-base) var(--ease-out);
+  }
+  .pl-dot::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); transition: background var(--t-base) var(--ease-out); }
+  .pl-node.is-active .pl-dot { border-color: var(--accent); box-shadow: var(--glow-accent); }
+  .pl-node.is-active .pl-dot::after { background: var(--accent); animation: pulse 1200ms var(--ease-in-out) infinite; }
+  .pl-node.is-done .pl-dot { border-color: var(--accent); }
+  .pl-node.is-done .pl-dot::after { background: var(--accent); }
+  .pl-node.is-failed .pl-dot { border-color: var(--danger); box-shadow: 0 0 0 1px rgba(214,58,49,.35), 0 0 24px rgba(214,58,49,.18); }
+  .pl-node.is-failed .pl-dot::after { background: var(--danger); }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: .6; } }
+  .pl-name { font-size: var(--fs-13); color: var(--ink-faint); white-space: nowrap; transition: color var(--t-base) var(--ease-out); }
+  .pl-node.is-active .pl-name, .pl-node.is-done .pl-name { color: var(--ink); }
+  .pl-node.is-failed .pl-name { color: var(--danger); }
+  .pl-status { text-align: center; font-size: var(--fs-14); color: var(--ink-muted); min-height: 1.6em; margin: var(--sp-5) 0 0; }
+  .pl-status .sec { font-family: var(--font-display); color: var(--accent); }
+  @media (prefers-reduced-motion: reduce) {
+    .pl-node.is-active .pl-dot::after { animation: none; }
+    .rail-fill { transition: none; }
+  }
+
+  /* Ошибка генерации */
+  .pl-error { margin-top: var(--sp-5); border-top: 1px solid var(--line); padding-top: var(--sp-5); text-align: center; }
+  .pl-error p { margin: 0 0 var(--sp-2); }
+  .pl-error .err-title { font-weight: var(--fw-semibold); color: var(--ink); }
+  .pl-error .err-text { font-size: var(--fs-14); color: var(--ink-muted); margin-bottom: var(--sp-4); }
+
+  /* ================= Результат: 4 карточки ================= */
+  .result-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-4); }
+  .result-head h2 { font-family: var(--font-display); font-weight: var(--fw-regular); font-size: var(--fs-28); margin: 0; }
+  .result-meta { display: flex; align-items: center; gap: var(--sp-3); font-size: var(--fs-13); color: var(--ink-muted); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+    padding: var(--sp-5); box-shadow: var(--shadow-2);
+    opacity: 0; transform: translateY(14px);
+  }
+  .card.is-in { opacity: 1; transform: none; transition: opacity var(--t-slow) var(--ease-out), transform var(--t-slow) var(--ease-out); }
+  @media (prefers-reduced-motion: reduce) { .card { opacity: 1; transform: none; transition: none; } }
+  .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+  .card h3 { font-family: var(--font-display); font-weight: var(--fw-regular); font-size: var(--fs-22); line-height: var(--lh-tight); margin: 0; }
+  .card-note { font-size: var(--fs-12); color: var(--ink-faint); }
+  .card-text { font-size: var(--fs-14); line-height: var(--lh-loose); color: var(--ink); margin: 0 0 var(--sp-4); white-space: pre-line; }
+  .card-actions { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; }
+  .copied-note { font-size: var(--fs-13); color: var(--ok); }
+
+  .tabs { display: inline-flex; gap: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px; margin-bottom: var(--sp-3); }
+  .tab {
+    font-family: var(--font-text); font-size: var(--fs-13); font-weight: var(--fw-medium);
+    color: var(--ink-muted); background: transparent; border: 0; cursor: pointer;
+    padding: 7px 13px; border-radius: var(--r-sm);
+    transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+  }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected="true"] { background: var(--surface-2); color: var(--ink); box-shadow: var(--shadow-1); }
+
+  .task-rows { display: flex; flex-direction: column; gap: var(--sp-3); margin: 0 0 var(--sp-4); }
+  .task-row { display: grid; grid-template-columns: 92px 1fr; gap: var(--sp-3); font-size: var(--fs-14); }
+  .task-row dt { color: var(--ink-faint); margin: 0; }
+  .task-row dd { margin: 0; color: var(--ink); }
+
+  .cls-row { display: flex; align-items: center; gap: var(--sp-4); flex-wrap: wrap; margin-bottom: var(--sp-4); }
+  .cat-chip { display: inline-block; padding: 6px 12px; border-radius: var(--r-pill); border: 1px solid var(--line-strong); font-size: var(--fs-13); color: var(--ink); }
+  .sev { display: inline-flex; align-items: center; gap: var(--sp-2); }
+  .sev-comb { display: inline-flex; align-items: flex-end; gap: 3px; height: 22px; }
+  .sev-comb i { width: 4px; border-radius: 2px; background: var(--line-strong); }
+  .sev-comb i:nth-child(1){height:6px} .sev-comb i:nth-child(2){height:10px}
+  .sev-comb i:nth-child(3){height:14px} .sev-comb i:nth-child(4){height:18px} .sev-comb i:nth-child(5){height:22px}
+  .sev[data-level="4"] { --sev-color: var(--sev-4); }
+  .sev[data-level="4"] .sev-comb i:nth-child(-n+4) { background: var(--sev-color); }
+  .sev .sev-num { font-family: var(--font-display); font-size: var(--fs-18); color: var(--sev-color); }
+  .sev .sev-word { font-size: var(--fs-13); color: var(--ink-muted); }
+
+  .repeat-block, .fake-block {
+    border: 1px solid var(--line); border-radius: var(--r-md);
+    padding: var(--sp-3) var(--sp-4); font-size: var(--fs-14); margin-bottom: var(--sp-3);
+  }
+  .repeat-block b { color: var(--sev-3); font-weight: var(--fw-semibold); }
+  .repeat-block .links { margin-top: var(--sp-1); font-size: var(--fs-13); }
+  .repeat-block a { color: var(--accent); text-decoration: none; }
+  .repeat-block a:hover { text-decoration: underline; }
+  .fake-block { border-style: dashed; color: var(--ink-muted); }
+  .fake-block .fb-title { color: var(--ink); font-weight: var(--fw-medium); display: block; margin-bottom: 2px; }
+  .fake-block .fb-foot { font-size: var(--fs-12); color: var(--ink-faint); display: block; margin-top: var(--sp-1); }
+
+  .comp-block { background: var(--bg); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-14); margin-bottom: var(--sp-4); }
+  .comp-block .cb-label { font-size: var(--fs-12); letter-spacing: var(--ls-caps); text-transform: uppercase; color: var(--ink-faint); display: block; margin-bottom: 2px; }
+
+  /* ================= Тост ================= */
+  .toast {
+    position: fixed; bottom: var(--sp-5); left: 50%; transform: translateX(-50%) translateY(8px);
+    display: inline-flex; align-items: center; gap: var(--sp-2); opacity: 0; pointer-events: none;
+    background: var(--surface-2); border: 1px solid var(--line-strong); border-left: 3px solid var(--ok);
+    border-radius: var(--r-md); padding: 12px 16px; box-shadow: var(--shadow-3); font-size: var(--fs-14);
+    transition: opacity var(--t-base) var(--ease-out), transform var(--t-base) var(--ease-out);
+  }
+  .toast.is-show { opacity: 1; transform: translateX(-50%); }
+
+  /* ================= Демо-переключатель состояний ================= */
+  .demo-bar {
+    position: fixed; top: var(--sp-3); right: var(--sp-3); z-index: 10;
+    display: flex; gap: 2px; background: var(--surface-2); border: 1px solid var(--line-strong);
+    border-radius: var(--r-pill); padding: 3px; font-size: var(--fs-12);
+  }
+  .demo-bar button { background: transparent; border: 0; color: var(--ink-muted); padding: 5px 10px; border-radius: var(--r-pill); cursor: pointer; font-size: var(--fs-12); }
+  .demo-bar button.is-on { background: var(--accent); color: var(--ink-on-accent); }
+
+  /* ================= Адаптив ================= */
+  @media (max-width: 880px) {
+    body { grid-template-columns: 1fr; }
+    .side { position: static; height: auto; flex-direction: row; align-items: center; gap: var(--sp-4); border-right: 0; border-bottom: 1px solid var(--line); padding: var(--sp-3) var(--sp-4); }
+    nav { flex-direction: row; gap: 2px; }
+    .nav-item { padding: 8px 10px; font-size: var(--fs-13); }
+    .usage { margin: 0 0 0 auto; text-align: right; }
+    .usage .usage-num { font-size: var(--fs-16); display: inline; margin-right: 4px; }
+    .usage-bar, .usage-label { display: none; }
+    .main { padding: var(--sp-5) var(--sp-4) var(--sp-7); }
+    h1 { font-size: var(--fs-28); }
+    .grid { grid-template-columns: 1fr; }
+    .pl-name { font-size: var(--fs-12); }
+    .task-row { grid-template-columns: 1fr; gap: 2px; }
+    .demo-bar { top: auto; bottom: var(--sp-3); right: var(--sp-3); }
+  }
+</style>
+</head>
+<body>
+  <aside class="side">
+    <div class="logo">Reply<b>Desk</b></div>
+    <nav aria-label="Основные разделы">
+      <a class="nav-item is-active" href="#" aria-current="page">Генерация</a>
+      <a class="nav-item" href="screen-history.html">История</a>
+      <a class="nav-item" href="screen-settings.html">Настройки</a>
+    </nav>
+    <div class="usage">
+      <span class="usage-num">7 из 10</span>
+      <span class="usage-label">генераций в июне, тариф Free</span>
+      <div class="usage-bar" aria-hidden="true"><i></i></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- ============ Состояние 1: пустое ============ -->
+    <section id="state-empty">
+      <h1>Новый отзыв</h1>
+      <p class="sub">Вставьте отзыв клиента — соберём ответ для площадки, задачу для команды и план возврата клиента</p>
+      <div class="compose">
+        <div class="field">
+          <label for="review-text">Текст отзыва</label>
+          <textarea class="textarea" id="review-text">Записывалась на окрашивание к 14:00, в итоге прождала сорок минут, пока мастер «освободится». Само окрашивание тоже не порадовало — корни заметно светлее длины, хотя я показывала фото-референс. За 8500 рублей ожидаешь другого уровня. Администратор на претензию только пожала плечами.</textarea>
+        </div>
+        <div class="compose-row">
+          <div class="field" style="margin: 0;">
+            <span class="group-label" id="src-label">Площадка</span>
+            <div class="chips" role="radiogroup" aria-labelledby="src-label">
+              <label class="chip src-yandex"><input type="radio" name="src" checked><span>Яндекс.Карты</span></label>
+              <label class="chip src-2gis"><input type="radio" name="src"><span>2ГИС</span></label>
+              <label class="chip src-ozon"><input type="radio" name="src"><span>Ozon</span></label>
+              <label class="chip src-wb"><input type="radio" name="src"><span>Wildberries</span></label>
+            </div>
+          </div>
+          <div class="field" style="margin: 0;">
+            <span class="group-label" id="rate-label">Оценка клиента</span>
+            <div class="stars" role="radiogroup" aria-labelledby="rate-label">
+              <label class="star"><input type="radio" name="rate"><span>1</span></label>
+              <label class="star"><input type="radio" name="rate" checked><span>2</span></label>
+              <label class="star"><input type="radio" name="rate"><span>3</span></label>
+              <label class="star"><input type="radio" name="rate"><span>4</span></label>
+              <label class="star"><input type="radio" name="rate"><span>5</span></label>
+            </div>
+          </div>
+        </div>
+        <div class="compose-foot">
+          <button class="btn btn-primary" id="go">Сгенерировать пакет реакции</button>
+          <span class="left-note">Осталось 3 генерации в этом месяце</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Состояние 2: пайплайн ============ -->
+    <section id="state-pipeline" hidden>
+      <h1>Собираем пакет реакции</h1>
+      <p class="sub">Обычно это занимает около восьми секунд — не закрывайте страницу</p>
+      <div class="pipeline">
+        <p class="pl-review">«Записывалась на окрашивание к 14:00, в итоге прождала сорок минут, пока мастер освободится. Само окрашивание тоже не порадовало — корни заметно светлее длины…»</p>
+        <div class="rail" aria-hidden="true">
+          <div class="rail-fill" id="rail-fill"></div>
+          <div class="pl-node" data-stage="0"><span class="pl-dot"></span><span class="pl-name">Отзыв</span></div>
+          <div class="pl-node" data-stage="1"><span class="pl-dot"></span><span class="pl-name">Анализ</span></div>
+          <div class="pl-node" data-stage="2"><span class="pl-dot"></span><span class="pl-name">Тональность</span></div>
+          <div class="pl-node" data-stage="3"><span class="pl-dot"></span><span class="pl-name">Пакет</span></div>
+        </div>
+        <p class="pl-status" id="pl-status" role="status" aria-live="polite"></p>
+        <div class="pl-error" id="pl-error" hidden>
+          <p class="err-title">Не получилось собрать пакет</p>
+          <p class="err-text">Сервис генерации не ответил вовремя. Лимит не потрачен — попробуйте ещё раз, отзыв сохранён.</p>
+          <button class="btn btn-secondary" id="retry">Повторить генерацию</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Состояние 3: результат ============ -->
+    <section id="state-result" hidden>
+      <div class="result-head">
+        <h2>Пакет реакции готов</h2>
+        <div class="result-meta"><span>Яндекс.Карты</span><span>·</span><span>11 июня, 14:32</span></div>
+      </div>
+      <div class="grid">
+        <!-- Публичный ответ -->
+        <article class="card" data-order="0">
+          <div class="card-head">
+            <h3>Публичный ответ</h3>
+            <span class="card-note">адаптировано под Яндекс.Карты</span>
+          </div>
+          <div class="tabs" role="tablist" aria-label="Тон ответа">
+            <button class="tab" role="tab" aria-selected="false" data-tone="soft">Мягкий</button>
+            <button class="tab" role="tab" aria-selected="true" data-tone="neutral">Нейтральный</button>
+            <button class="tab" role="tab" aria-selected="false" data-tone="firm">Уверенный</button>
+          </div>
+          <p class="card-text" id="reply-text">Анна, спасибо, что написали — разобрались в ситуации. Ожидание возникло из-за сдвига предыдущей записи, и мы должны были предупредить вас заранее. По окрашиванию: пригласим вас на бесплатную коррекцию к старшему колористу в удобное время. Администратор свяжется с вами сегодня. Будем рады вернуть ваше доверие.</p>
+          <div class="card-actions">
+            <button class="btn btn-secondary" data-copy="reply-text">Скопировать ответ</button>
+            <span class="copied-note" hidden>Скопировано</span>
+          </div>
+        </article>
+
+        <!-- Внутренняя задача -->
+        <article class="card" data-order="1">
+          <div class="card-head"><h3>Внутренняя задача</h3></div>
+          <dl class="task-rows">
+            <div class="task-row"><dt>Что</dt><dd>Клиент ждал 40 минут сверх записи; результат окрашивания не совпал с референсом (корни светлее длины)</dd></div>
+            <div class="task-row"><dt>Причина</dt><dd>Вероятно, наложение записей у мастера и пропуск этапа сверки с фото перед окрашиванием</dd></div>
+            <div class="task-row"><dt>Проверить</dt><dd>Журнал записей за 11 июня после 13:00; фото «до/после» из карточки визита; реакцию администратора на претензию</dd></div>
+            <div class="task-row"><dt>Кому</dt><dd>Управляющий салона + старший колорист</dd></div>
+          </dl>
+          <div class="card-actions">
+            <button class="btn btn-secondary" data-copy="task-copy">Скопировать задачу</button>
+            <span class="copied-note" hidden>Скопировано</span>
+          </div>
+          <div id="task-copy" hidden>Что: клиент ждал 40 минут сверх записи; результат окрашивания не совпал с референсом. Причина: вероятно, наложение записей и пропуск сверки с фото. Проверить: журнал записей за 11 июня после 13:00, фото визита, реакцию администратора. Кому: управляющий + старший колорист.</div>
+        </article>
+
+        <!-- Классификация -->
+        <article class="card" data-order="2">
+          <div class="card-head"><h3>Классификация</h3></div>
+          <div class="cls-row">
+            <span class="cat-chip">Качество услуги</span>
+            <span class="sev" data-level="4" aria-label="Серьёзность 4 из 5 — серьёзная">
+              <span class="sev-comb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="sev-num">4</span><span class="sev-word">серьёзная</span>
+            </span>
+          </div>
+          <div class="repeat-block">
+            <b>3-й похожий отзыв за месяц</b> — жалобы на ожидание сверх записи повторяются.
+            <div class="links">Похожие: <a href="screen-history.html">28 мая</a>, <a href="screen-history.html">5 июня</a></div>
+          </div>
+          <div class="fake-block">
+            <span class="fb-title">Признаков заказного отзыва не видим</span>
+            Описаны конкретные детали визита: время, услуга, цена, фото-референс — так обычно пишут реальные клиенты.
+            <span class="fb-foot">Оценка алгоритма, а не вывод. Решение всегда за вами.</span>
+          </div>
+        </article>
+
+        <!-- Возврат клиента -->
+        <article class="card" data-order="3">
+          <div class="card-head"><h3>Возврат клиента</h3></div>
+          <p class="card-text" id="winback-text">Анна, это Марина, владелица салона. Прочитала ваш отзыв — и мне правда жаль, что визит прошёл так. Хочу всё исправить лично: приглашаю вас на коррекцию окрашивания к нашему старшему колористу Ольге, бесплатно и в любое удобное время. Напишите мне или администратору — подберём окно на этой неделе.</p>
+          <div class="comp-block">
+            <span class="cb-label">Рекомендация по компенсации</span>
+            Бесплатная коррекция у старшего колориста + скидка 20% на следующий визит. Возврат полной суммы — только если коррекция не устроит.
+          </div>
+          <div class="card-actions">
+            <button class="btn btn-secondary" data-copy="winback-text">Скопировать сообщение</button>
+            <span class="copied-note" hidden>Скопировано</span>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status"><span style="color: var(--ok);">✓</span> Скопировано в буфер обмена</div>
+
+  <div class="demo-bar" role="group" aria-label="Демо: состояния экрана">
+    <button data-state="empty" class="is-on">Пустое</button>
+    <button data-state="pipeline">Пайплайн</button>
+    <button data-state="result">Результат</button>
+    <button data-state="error">Ошибка</button>
+  </div>
+
+<script>
+  // ===== Демонстрационная логика прототипа (в проде — SSE-статусы) =====
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const STAGE_MS = reduceMotion ? 0 : 1800;
+  const sections = {
+    empty: document.getElementById('state-empty'),
+    pipeline: document.getElementById('state-pipeline'),
+    result: document.getElementById('state-result'),
+  };
+  const nodes = [...document.querySelectorAll('.pl-node')];
+  const railFill = document.getElementById('rail-fill');
+  const statusEl = document.getElementById('pl-status');
+  const errorEl = document.getElementById('pl-error');
+  const stageText = [
+    'Читаю отзыв и выделяю факты…',
+    'Определяю категорию, серьёзность и повторяемость…',
+    'Подбираю тон под ваш бренд и правила площадки…',
+    'Собираю четыре блока пакета…',
+  ];
+  let timers = [];
+
+  function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+  function showState(name) {
+    clearTimers();
+    for (const k of Object.keys(sections)) sections[k].hidden = k !== name;
+    document.querySelectorAll('.demo-bar button').forEach(b =>
+      b.classList.toggle('is-on', b.dataset.state === name));
+  }
+
+  function resetPipeline() {
+    nodes.forEach(n => n.classList.remove('is-active', 'is-done', 'is-failed'));
+    railFill.style.transition = 'none';
+    railFill.style.width = '0';
+    railFill.offsetWidth; // reflow
+    railFill.style.transition = '';
+    errorEl.hidden = true;
+    statusEl.textContent = '';
+  }
+
+  function runPipeline({ failAt = -1 } = {}) {
+    showState('pipeline');
+    resetPipeline();
+    if (reduceMotion) {
+      // Статичная версия: без бегущего луча, этапы переключаются дискретно
+      railFill.style.transition = 'none';
+    }
+    const stepWidth = 100 / (nodes.length - 1);
+    for (let i = 0; i < nodes.length; i++) {
+      timers.push(setTimeout(() => {
+        nodes.forEach((n, j) => {
+          n.classList.toggle('is-done', j < i);
+          n.classList.toggle('is-active', j === i);
+        });
+        statusEl.textContent = stageText[i];
+        if (failAt === i) {
+          nodes[i].classList.remove('is-active');
+          nodes[i].classList.add('is-failed');
+          statusEl.textContent = '';
+          errorEl.hidden = false;
+          errorEl.querySelector('button').focus();
+          return;
+        }
+        railFill.style.width = (stepWidth * i) + '%';
+      }, (reduceMotion ? 600 : STAGE_MS) * i));
+      if (failAt === i) return;
+    }
+    // Завершение → результат
+    timers.push(setTimeout(() => {
+      nodes.forEach(n => { n.classList.remove('is-active'); n.classList.add('is-done'); });
+      showResult();
+    }, (reduceMotion ? 600 : STAGE_MS) * nodes.length));
+  }
+
+  function showResult() {
+    showState('result');
+    const cards = [...document.querySelectorAll('.card')];
+    cards.forEach(c => c.classList.remove('is-in'));
+    if (reduceMotion) { cards.forEach(c => c.classList.add('is-in')); return; }
+    cards.forEach(c => {
+      timers.push(setTimeout(() => c.classList.add('is-in'), 80 + 110 * Number(c.dataset.order)));
+    });
+  }
+
+  document.getElementById('go').addEventListener('click', () => runPipeline());
+  document.getElementById('retry').addEventListener('click', () => runPipeline());
+  document.querySelectorAll('.demo-bar button').forEach(b => b.addEventListener('click', () => {
+    const s = b.dataset.state;
+    if (s === 'pipeline') runPipeline();
+    else if (s === 'error') runPipeline({ failAt: 2 });
+    else if (s === 'result') showResult();
+    else showState('empty');
+  }));
+
+  // ===== Табы тона =====
+  const toneTexts = {
+    soft: 'Анна, нам очень жаль, что визит прошёл не так, как вы рассчитывали. Сорок минут ожидания — это действительно долго, простите нас. Мы хотим всё исправить: приглашаем вас на бесплатную коррекцию окрашивания к старшему колористу. Администратор свяжется с вами сегодня, чтобы подобрать удобное время.',
+    neutral: 'Анна, спасибо, что написали — разобрались в ситуации. Ожидание возникло из-за сдвига предыдущей записи, и мы должны были предупредить вас заранее. По окрашиванию: пригласим вас на бесплатную коррекцию к старшему колористу в удобное время. Администратор свяжется с вами сегодня. Будем рады вернуть ваше доверие.',
+    firm: 'Анна, спасибо за подробный отзыв. Мы проверили записи: предыдущий визит затянулся, и мастер предупредила администратора — но до вас информация не дошла, это наша ошибка. Что касается оттенка корней: на свежем окрашивании разница выравнивается за 5–7 дней, однако мы готовы провести коррекцию бесплатно, если результат вас не устроит.',
+  };
+  document.querySelectorAll('.tab[data-tone]').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.tab[data-tone]').forEach(x => x.setAttribute('aria-selected', String(x === t)));
+    document.getElementById('reply-text').textContent = toneTexts[t.dataset.tone];
+  }));
+
+  // ===== Копирование =====
+  const toast = document.getElementById('toast');
+  let toastTimer;
+  document.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
+    const text = document.getElementById(btn.dataset.copy).textContent.trim();
+    try { await navigator.clipboard.writeText(text); } catch (e) { /* file:// без clipboard — демо */ }
+    const note = btn.parentElement.querySelector('.copied-note');
+    note.hidden = false;
+    setTimeout(() => { note.hidden = true; }, 2000);
+    toast.classList.add('is-show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('is-show'), 2200);
+  }));
+</script>
+</body>
+</html>

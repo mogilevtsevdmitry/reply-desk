@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReplyDesk — UI-кит</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prata&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-text);
+    font-size: var(--fs-16);
+    line-height: var(--lh-base);
+    padding: var(--sp-6) var(--sp-5) var(--sp-8);
+  }
+  .kit { max-width: 960px; margin: 0 auto; }
+  h1 { font-family: var(--font-display); font-weight: var(--fw-regular); font-size: var(--fs-36); line-height: var(--lh-tight); margin: 0 0 var(--sp-2); }
+  .kit-sub { color: var(--ink-muted); margin: 0 0 var(--sp-7); }
+  section { margin-bottom: var(--sp-7); }
+  h2 {
+    font-family: var(--font-text); font-size: var(--fs-12); font-weight: var(--fw-semibold);
+    letter-spacing: var(--ls-caps); text-transform: uppercase; color: var(--ink-muted);
+    border-bottom: 1px solid var(--line); padding-bottom: var(--sp-2); margin: 0 0 var(--sp-4);
+  }
+  .row { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; }
+  .col { display: flex; flex-direction: column; gap: var(--sp-3); max-width: 420px; }
+  .hint { font-size: var(--fs-13); color: var(--ink-faint); }
+
+  /* ---------- Focus ring (везде) ---------- */
+  :focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-radius: var(--r-sm); }
+
+  /* ---------- Кнопки ---------- */
+  .btn {
+    font-family: var(--font-text); font-size: var(--fs-14); font-weight: var(--fw-medium);
+    line-height: 1; padding: 12px 20px; border-radius: var(--r-md);
+    border: 1px solid transparent; cursor: pointer;
+    display: inline-flex; align-items: center; gap: var(--sp-2);
+    transition: background var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+  }
+  .btn-primary { background: var(--accent); color: var(--ink-on-accent); }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:active { background: var(--accent-down); }
+  .btn-secondary { background: transparent; color: var(--ink); border-color: var(--line-strong); }
+  .btn-secondary:hover { background: var(--surface-2); border-color: var(--ink-faint); }
+  .btn-ghost { background: transparent; color: var(--ink-muted); }
+  .btn-ghost:hover { background: var(--surface-2); color: var(--ink); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn:disabled:hover { background: var(--accent); }
+  .btn-secondary:disabled:hover, .btn-ghost:disabled:hover { background: transparent; }
+  .btn.is-loading { position: relative; color: transparent; pointer-events: none; }
+  .btn.is-loading::after {
+    content: ""; position: absolute; inset: 0; margin: auto;
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid rgba(13, 26, 31, 0.3); border-top-color: var(--ink-on-accent);
+    animation: spin 700ms linear infinite;
+  }
+  .btn-secondary.is-loading::after, .btn-ghost.is-loading::after {
+    border-color: var(--line-strong); border-top-color: var(--ink);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .btn.is-loading::after { animation: none; border-top-color: transparent; }
+  }
+
+  /* ---------- Поля ввода ---------- */
+  .field { display: flex; flex-direction: column; gap: var(--sp-1); }
+  .field label { font-size: var(--fs-13); font-weight: var(--fw-medium); color: var(--ink-muted); }
+  .input, .textarea {
+    font-family: var(--font-text); font-size: var(--fs-16); color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line-strong);
+    border-radius: var(--r-md); padding: 11px 14px; width: 100%;
+    transition: border-color var(--t-fast) var(--ease-out);
+  }
+  .input::placeholder, .textarea::placeholder { color: var(--ink-faint); }
+  .input:hover, .textarea:hover { border-color: var(--ink-faint); }
+  .input:focus-visible, .textarea:focus-visible { outline: var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
+  .input.is-error { border-color: var(--danger); }
+  .field .error-text { font-size: var(--fs-13); color: var(--sev-4); }
+  .input:disabled, .textarea:disabled { opacity: 0.45; cursor: not-allowed; }
+  .textarea { resize: vertical; min-height: 120px; line-height: var(--lh-base); }
+
+  /* ---------- Табы ---------- */
+  .tabs { display: inline-flex; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 3px; }
+  .tab {
+    font-family: var(--font-text); font-size: var(--fs-14); font-weight: var(--fw-medium);
+    color: var(--ink-muted); background: transparent; border: 0; cursor: pointer;
+    padding: 8px 16px; border-radius: var(--r-sm);
+    transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+  }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected="true"] { background: var(--surface-2); color: var(--ink); box-shadow: var(--shadow-1); }
+
+  /* ---------- Карточка ---------- */
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-lg); padding: var(--sp-5); box-shadow: var(--shadow-2);
+    max-width: 420px;
+  }
+  .card h3 { font-family: var(--font-display); font-weight: var(--fw-regular); font-size: var(--fs-22); line-height: var(--lh-tight); margin: 0 0 var(--sp-2); }
+  .card p { margin: 0; color: var(--ink-muted); font-size: var(--fs-14); }
+
+  /* ---------- Тост ---------- */
+  .toast {
+    display: inline-flex; align-items: center; gap: var(--sp-2);
+    background: var(--surface-2); border: 1px solid var(--line-strong);
+    border-left: 3px solid var(--ok);
+    border-radius: var(--r-md); padding: 12px 16px; box-shadow: var(--shadow-3);
+    font-size: var(--fs-14);
+  }
+  .toast.is-error { border-left-color: var(--danger); }
+  .toast .toast-icon { color: var(--ok); }
+  .toast.is-error .toast-icon { color: var(--danger); }
+
+  /* ---------- Бейджи источников ---------- */
+  .src {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: var(--fs-13); font-weight: var(--fw-medium); color: var(--ink-muted);
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-pill); padding: 4px 12px 4px 8px;
+  }
+  .src::before { content: ""; width: 8px; height: 8px; border-radius: 50%; }
+  .src-yandex::before { background: #f5523a; }
+  .src-2gis::before  { background: #55b04f; }
+  .src-ozon::before  { background: #4f7df5; }
+  .src-wb::before    { background: #b65ad4; }
+
+  /* ---------- Severity-индикатор: «гребёнка» ---------- */
+  /* Фирменный элемент: 5 штрихов нарастающей высоты, как след сейсмографа.
+     Заполнение = уровень; цвет — токен соответствующего уровня. */
+  .sev { display: inline-flex; align-items: center; gap: var(--sp-2); }
+  .sev-comb { display: inline-flex; align-items: flex-end; gap: 3px; height: 22px; }
+  .sev-comb i { width: 4px; border-radius: 2px; background: var(--line-strong); }
+  .sev-comb i:nth-child(1) { height: 6px; }
+  .sev-comb i:nth-child(2) { height: 10px; }
+  .sev-comb i:nth-child(3) { height: 14px; }
+  .sev-comb i:nth-child(4) { height: 18px; }
+  .sev-comb i:nth-child(5) { height: 22px; }
+  .sev[data-level="1"] .sev-comb i:nth-child(-n+1),
+  .sev[data-level="2"] .sev-comb i:nth-child(-n+2),
+  .sev[data-level="3"] .sev-comb i:nth-child(-n+3),
+  .sev[data-level="4"] .sev-comb i:nth-child(-n+4),
+  .sev[data-level="5"] .sev-comb i:nth-child(-n+5) { background: var(--sev-color); }
+  .sev[data-level="1"] { --sev-color: var(--sev-1); }
+  .sev[data-level="2"] { --sev-color: var(--sev-2); }
+  .sev[data-level="3"] { --sev-color: var(--sev-3); }
+  .sev[data-level="4"] { --sev-color: var(--sev-4); }
+  .sev[data-level="5"] { --sev-color: var(--sev-5); }
+  .sev .sev-num { font-family: var(--font-display); font-size: var(--fs-18); color: var(--sev-color); min-width: 1ch; }
+  .sev .sev-word { font-size: var(--fs-13); color: var(--ink-muted); }
+
+  /* ---------- Скелетоны ---------- */
+  .skeleton {
+    border-radius: var(--r-sm);
+    background: linear-gradient(100deg, var(--surface) 40%, var(--surface-2) 50%, var(--surface) 60%);
+    background-size: 200% 100%;
+    animation: shimmer 1400ms var(--ease-in-out) infinite;
+  }
+  @keyframes shimmer { from { background-position: 130% 0; } to { background-position: -30% 0; } }
+  @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; background: var(--surface-2); } }
+  .sk-line { height: 14px; width: 100%; }
+  .sk-line.short { width: 55%; }
+  .sk-title { height: 22px; width: 40%; }
+  .sk-block { height: 96px; }
+</style>
+</head>
+<body>
+<div class="kit">
+  <h1>UI-кит ReplyDesk</h1>
+  <p class="kit-sub">Компоненты пульта. Тёмная тема — единственная. Все интерактивные элементы получают видимый focus-ring (проверьте Tab).</p>
+
+  <section>
+    <h2>Кнопки</h2>
+    <div class="row">
+      <button class="btn btn-primary">Сгенерировать пакет реакции</button>
+      <button class="btn btn-primary is-loading">Сгенерировать пакет реакции</button>
+      <button class="btn btn-primary" disabled>Сгенерировать пакет реакции</button>
+    </div>
+    <div class="row" style="margin-top: var(--sp-3);">
+      <button class="btn btn-secondary">Сохранить настройки</button>
+      <button class="btn btn-secondary is-loading">Сохранить настройки</button>
+      <button class="btn btn-secondary" disabled>Сохранить настройки</button>
+    </div>
+    <div class="row" style="margin-top: var(--sp-3);">
+      <button class="btn btn-ghost">Отменить</button>
+      <button class="btn btn-ghost" disabled>Отменить</button>
+    </div>
+    <p class="hint">Hover и active — встроены; loading — класс <code>.is-loading</code>; primary зарезервирована за AI-действиями.</p>
+  </section>
+
+  <section>
+    <h2>Поля ввода</h2>
+    <div class="col">
+      <div class="field">
+        <label for="f1">Электронная почта</label>
+        <input class="input" id="f1" type="email" placeholder="name@company.ru">
+      </div>
+      <div class="field">
+        <label for="f2">Электронная почта</label>
+        <input class="input is-error" id="f2" type="email" value="name@company">
+        <span class="error-text">Проверьте адрес — похоже, он неполный</span>
+      </div>
+      <div class="field">
+        <label for="f3">Название компании</label>
+        <input class="input" id="f3" type="text" value="Стоматология «Дента-Юг»" disabled>
+      </div>
+      <div class="field">
+        <label for="f4">Текст отзыва</label>
+        <textarea class="textarea" id="f4" placeholder="Вставьте отзыв клиента — целиком, как он опубликован на площадке"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Табы</h2>
+    <div class="tabs" role="tablist" aria-label="Тон ответа">
+      <button class="tab" role="tab" aria-selected="true">Мягкий</button>
+      <button class="tab" role="tab" aria-selected="false">Нейтральный</button>
+      <button class="tab" role="tab" aria-selected="false">Уверенный</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Карточка</h2>
+    <div class="card">
+      <h3>Публичный ответ</h3>
+      <p>Базовая карточка результата: display-заголовок, текст, действия. Содержимое варьируется по типу блока.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Тосты</h2>
+    <div class="row">
+      <div class="toast" role="status"><span class="toast-icon">✓</span> Ответ скопирован в буфер обмена</div>
+      <div class="toast is-error" role="alert"><span class="toast-icon">!</span> Не удалось сохранить — повторите попытку</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Бейджи источников</h2>
+    <div class="row">
+      <span class="src src-yandex">Яндекс.Карты</span>
+      <span class="src src-2gis">2ГИС</span>
+      <span class="src src-ozon">Ozon</span>
+      <span class="src src-wb">Wildberries</span>
+    </div>
+    <p class="hint">Брендовый цвет — только точка-маркер; сами бейджи остаются в палитре продукта.</p>
+  </section>
+
+  <section>
+    <h2>Severity-индикатор «гребёнка»</h2>
+    <div class="row" style="gap: var(--sp-6);">
+      <span class="sev" data-level="1" aria-label="Серьёзность 1 из 5 — фоновая">
+        <span class="sev-comb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="sev-num">1</span><span class="sev-word">фоновая</span>
+      </span>
+      <span class="sev" data-level="2" aria-label="Серьёзность 2 из 5 — лёгкая">
+        <span class="sev-comb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="sev-num">2</span><span class="sev-word">лёгкая</span>
+      </span>
+      <span class="sev" data-level="3" aria-label="Серьёзность 3 из 5 — заметная">
+        <span class="sev-comb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="sev-num">3</span><span class="sev-word">заметная</span>
+      </span>
+      <span class="sev" data-level="4" aria-label="Серьёзность 4 из 5 — серьёзная">
+        <span class="sev-comb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="sev-num">4</span><span class="sev-word">серьёзная</span>
+      </span>
+      <span class="sev" data-level="5" aria-label="Серьёзность 5 из 5 — критичная">
+        <span class="sev-comb" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="sev-num">5</span><span class="sev-word">критичная</span>
+      </span>
+    </div>
+    <p class="hint">След сейсмографа: заполненные штрихи показывают уровень, цвет — температуру проблемы. Числа и слова дублируют цвет для доступности.</p>
+  </section>
+
+  <section>
+    <h2>Скелетоны загрузки</h2>
+    <div class="col">
+      <div class="skeleton sk-title"></div>
+      <div class="skeleton sk-line"></div>
+      <div class="skeleton sk-line"></div>
+      <div class="skeleton sk-line short"></div>
+      <div class="skeleton sk-block"></div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

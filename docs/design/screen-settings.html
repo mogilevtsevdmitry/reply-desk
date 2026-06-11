@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReplyDesk — настройки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prata&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: var(--bg); color: var(--ink);
+    font-family: var(--font-text); font-size: var(--fs-16); line-height: var(--lh-base);
+    display: grid; grid-template-columns: 232px 1fr;
+  }
+  :focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-radius: var(--r-sm); }
+
+  /* ---------- Сайдбар ---------- */
+  .side {
+    border-right: 1px solid var(--line); padding: var(--sp-5) var(--sp-4);
+    display: flex; flex-direction: column; gap: var(--sp-6);
+    position: sticky; top: 0; height: 100vh;
+  }
+  .logo { font-family: var(--font-display); font-size: var(--fs-18); }
+  .logo b { color: var(--accent); font-weight: var(--fw-regular); }
+  nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    display: block; padding: 10px 12px; border-radius: var(--r-md);
+    color: var(--ink-muted); text-decoration: none; font-size: var(--fs-14); font-weight: var(--fw-medium);
+    transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+  }
+  .nav-item:hover { background: var(--surface-2); color: var(--ink); }
+  .nav-item.is-active { background: var(--surface-2); color: var(--accent); }
+  .usage { margin-top: auto; font-size: var(--fs-13); color: var(--ink-muted); }
+  .usage .usage-num { font-family: var(--font-display); font-size: var(--fs-22); color: var(--ink); display: block; }
+  .usage-bar { height: 4px; border-radius: 2px; background: var(--line); margin-top: var(--sp-2); overflow: hidden; }
+  .usage-bar i { display: block; height: 100%; width: 70%; background: var(--accent); border-radius: 2px; }
+
+  .main { padding: var(--sp-6) var(--sp-6) var(--sp-8); max-width: 720px; }
+  h1 { font-family: var(--font-display); font-weight: var(--fw-regular); font-size: var(--fs-36); line-height: var(--lh-tight); margin: 0 0 var(--sp-2); }
+  .sub { color: var(--ink-muted); font-size: var(--fs-14); margin: 0 0 var(--sp-6); }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-5); box-shadow: var(--shadow-2); margin-bottom: var(--sp-5); }
+  .panel h2 { font-family: var(--font-display); font-weight: var(--fw-regular); font-size: var(--fs-22); margin: 0 0 var(--sp-4); }
+
+  .field { display: flex; flex-direction: column; gap: var(--sp-1); margin-bottom: var(--sp-4); }
+  .field:last-child { margin-bottom: 0; }
+  .field label, .group-label { font-size: var(--fs-13); font-weight: var(--fw-medium); color: var(--ink-muted); }
+  .input, .textarea, .select {
+    font-family: var(--font-text); font-size: var(--fs-16); color: var(--ink);
+    background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--r-md);
+    padding: 11px 14px; width: 100%;
+    transition: border-color var(--t-fast) var(--ease-out);
+  }
+  .input:hover, .textarea:hover, .select:hover { border-color: var(--ink-faint); }
+  .input:focus-visible, .textarea:focus-visible, .select:focus-visible { outline: var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
+  .textarea { resize: vertical; min-height: 120px; line-height: var(--lh-base); }
+  .hint { font-size: var(--fs-13); color: var(--ink-faint); margin-top: var(--sp-1); }
+
+  .tone-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); margin-top: var(--sp-2); }
+  .tone-card { position: relative; }
+  .tone-card input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .tone-card .tc-body {
+    display: block; border: 1px solid var(--line-strong); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); height: 100%;
+    transition: border-color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
+  }
+  .tone-card input:hover + .tc-body { border-color: var(--ink-faint); }
+  .tone-card input:checked + .tc-body { border-color: var(--accent); background: var(--accent-dim); }
+  .tone-card input:focus-visible + .tc-body { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+  .tc-body b { display: block; font-weight: var(--fw-semibold); font-size: var(--fs-14); margin-bottom: 2px; }
+  .tc-body span { font-size: var(--fs-13); color: var(--ink-muted); }
+
+  /* Тариф */
+  .plan { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; }
+  .plan-num { font-family: var(--font-display); font-size: var(--fs-48); line-height: 1; }
+  .plan-num small { font-family: var(--font-text); font-size: var(--fs-14); color: var(--ink-muted); }
+  .plan-bar { flex: 1 1 200px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .plan-bar i { display: block; height: 100%; width: 70%; background: var(--accent); border-radius: 3px; }
+  .plan-note { width: 100%; font-size: var(--fs-13); color: var(--ink-faint); margin: var(--sp-2) 0 0; }
+
+  .save-row { display: flex; align-items: center; gap: var(--sp-4); }
+  .btn {
+    font-family: var(--font-text); font-size: var(--fs-14); font-weight: var(--fw-medium);
+    line-height: 1; padding: 13px 22px; border-radius: var(--r-md);
+    border: 1px solid transparent; cursor: pointer;
+    transition: background var(--t-fast) var(--ease-out);
+  }
+  .btn-primary { background: var(--accent); color: var(--ink-on-accent); }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .save-note { font-size: var(--fs-13); color: var(--ink-faint); }
+
+  @media (max-width: 880px) {
+    body { grid-template-columns: 1fr; }
+    .side { position: static; height: auto; flex-direction: row; align-items: center; gap: var(--sp-4); border-right: 0; border-bottom: 1px solid var(--line); padding: var(--sp-3) var(--sp-4); }
+    nav { flex-direction: row; gap: 2px; }
+    .nav-item { padding: 8px 10px; font-size: var(--fs-13); }
+    .usage { margin: 0 0 0 auto; text-align: right; }
+    .usage .usage-num { font-size: var(--fs-16); display: inline; margin-right: 4px; }
+    .usage-bar, .usage-label { display: none; }
+    .main { padding: var(--sp-5) var(--sp-4) var(--sp-7); }
+    h1 { font-size: var(--fs-28); }
+    .tone-cards { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <aside class="side">
+    <div class="logo">Reply<b>Desk</b></div>
+    <nav aria-label="Основные разделы">
+      <a class="nav-item" href="screen-generate.html">Генерация</a>
+      <a class="nav-item" href="screen-history.html">История</a>
+      <a class="nav-item is-active" href="#" aria-current="page">Настройки</a>
+    </nav>
+    <div class="usage">
+      <span class="usage-num">7 из 10</span>
+      <span class="usage-label">генераций в июне, тариф Free</span>
+      <div class="usage-bar" aria-hidden="true"><i></i></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <h1>Настройки</h1>
+    <p class="sub">Компания, голос бренда и тариф — изменения применяются к новым генерациям</p>
+
+    <section class="panel">
+      <h2>Компания</h2>
+      <div class="field">
+        <label for="company">Название</label>
+        <input class="input" id="company" type="text" value="Салон Марины">
+      </div>
+      <div class="field">
+        <label for="niche">Ниша</label>
+        <select class="select" id="niche">
+          <option selected>Салон красоты</option>
+          <option>Стоматология</option>
+          <option>Ресторан</option>
+          <option>Автосервис</option>
+          <option>Фитнес</option>
+          <option>Другое</option>
+        </select>
+        <p class="hint">Смена ниши подключает другие отраслевые правила для ответов</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Тон бренда</h2>
+      <div class="field">
+        <span class="group-label" id="tone-label">Тон по умолчанию</span>
+        <div class="tone-cards" role="radiogroup" aria-labelledby="tone-label">
+          <label class="tone-card"><input type="radio" name="tone">
+            <span class="tc-body"><b>Мягкий</b><span>Сопереживаем, извиняемся первыми</span></span>
+          </label>
+          <label class="tone-card"><input type="radio" name="tone" checked>
+            <span class="tc-body"><b>Нейтральный</b><span>Признаём факты, называем шаги</span></span>
+          </label>
+          <label class="tone-card"><input type="radio" name="tone">
+            <span class="tc-body"><b>Уверенный</b><span>Корректно отстаиваем позицию</span></span>
+          </label>
+        </div>
+      </div>
+      <div class="field">
+        <label for="forbidden">Чего избегать в ответах</label>
+        <input class="input" id="forbidden" type="text" value="Не обещать возврат денег без проверки записи визита">
+      </div>
+      <div class="field">
+        <label for="samples">Примеры ваших текстов</label>
+        <textarea class="textarea" id="samples">Анна, спасибо, что рассказали. Мастер Ольга уже знает о ситуации — приходите в четверг, поправим укладку за наш счёт.
+
+Дмитрий, рады, что стрижка понравилась. Передали ваши слова Сергею — ждём вас снова.</textarea>
+        <p class="hint">AI опирается на эти примеры, чтобы звучать как вы, а не как робот</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Тариф</h2>
+      <div class="plan">
+        <div class="plan-num">7 <small>из 10 генераций в июне</small></div>
+        <div class="plan-bar" role="img" aria-label="Использовано 7 из 10 генераций"><i></i></div>
+        <p class="plan-note">Тариф Free. Счётчик обнулится 1 июля. Платные тарифы появятся позже — мы напишем вам на почту.</p>
+      </div>
+    </section>
+
+    <div class="save-row">
+      <button class="btn btn-primary" type="button">Сохранить настройки</button>
+      <span class="save-note">Прошлые генерации не изменятся</span>
+    </div>
+  </main>
+</body>
+</html>
