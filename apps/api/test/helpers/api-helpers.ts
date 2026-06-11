@@ -35,7 +35,7 @@ export async function registerUser(
 ): Promise<RegisteredUser> {
   const res = await request(app.getHttpServer())
     .post('/api/v1/auth/register')
-    .send({ email, password })
+    .send({ email, password, acceptTerms: true, acceptLlm: true })
     .expect(201);
 
   const userId = (res.body as { user: { id: string } }).user.id;

@@ -1,12 +1,13 @@
 import type { ConfigService } from '@nestjs/config';
 import type { JwtService } from '@nestjs/jwt';
 import type { RefreshToken, User } from '@prisma/client';
+import { RegisterDtoSchema, type RegisterDto } from '@replydesk/contracts';
 import * as bcrypt from 'bcryptjs';
 import { createHash } from 'node:crypto';
 import { AppException } from '../../common/app.exception';
 import type { Env } from '../../config/env';
 import type { PrismaService } from '../../prisma/prisma.service';
-import { AuthService } from './auth.service';
+import { AuthService, CONSENT_DOCS_VERSION } from './auth.service';
 
 /** Тесты ротации refresh-токена, детекта повторного использования и login-флоу. БД мокается. */
 
@@ -70,6 +71,9 @@ const user: User = {
   passwordHash: bcrypt.hashSync('Correct12345', 4), // низкий cost только для скорости тестов
   companyId: 'c1',
   createdAt: new Date('2026-06-01T00:00:00Z'),
+  consentPdAt: new Date('2026-06-01T00:00:00Z'),
+  consentLlmAt: new Date('2026-06-01T00:00:00Z'),
+  consentDocsVersion: 'v1.0',
 };
 
 describe('AuthService — ротация refresh-токена', () => {
@@ -204,5 +208,56 @@ describe('AuthService — login', () => {
     };
     expect(createArg.data.tokenHash).toBe(sha256(tokens.refreshToken));
     expect(createArg.data.tokenHash).not.toBe(tokens.refreshToken); // в БД только хэш
+  });
+});
+
+describe('AuthService — регистрация с согласиями (152-ФЗ)', () => {
+  const dto: RegisterDto = {
+    email: 'new@example.com',
+    password: 'Correct12345',
+    acceptTerms: true,
+    acceptLlm: true,
+  };
+
+  it('register сохраняет consentPdAt, consentLlmAt и consentDocsVersion', async () => {
+    const prisma = makePrisma();
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.create.mockImplementation(
+      async ({ data }: { data: Record<string, unknown> }) => ({
+        id: 'u-new',
+        companyId: null,
+        createdAt: new Date(),
+        ...data,
+      }),
+    );
+    const service = makeService(prisma);
+
+    await service.register(dto);
+
+    const createArg = prisma.user.create.mock.calls[0]![0] as {
+      data: {
+        consentPdAt: Date;
+        consentLlmAt: Date;
+        consentDocsVersion: string;
+      };
+    };
+    expect(createArg.data.consentPdAt).toBeInstanceOf(Date);
+    expect(createArg.data.consentLlmAt).toBeInstanceOf(Date);
+    // оба согласия фиксируются одним моментом времени
+    expect(createArg.data.consentLlmAt).toEqual(createArg.data.consentPdAt);
+    expect(createArg.data.consentDocsVersion).toBe(CONSENT_DOCS_VERSION);
+  });
+
+  it('контракт RegisterDto: без acceptTerms/acceptLlm или с false — не проходит валидацию', () => {
+    expect(RegisterDtoSchema.safeParse(dto).success).toBe(true);
+
+    const { acceptTerms: _t, ...withoutTerms } = dto;
+    expect(RegisterDtoSchema.safeParse(withoutTerms).success).toBe(false);
+
+    const { acceptLlm: _l, ...withoutLlm } = dto;
+    expect(RegisterDtoSchema.safeParse(withoutLlm).success).toBe(false);
+
+    expect(RegisterDtoSchema.safeParse({ ...dto, acceptTerms: false }).success).toBe(false);
+    expect(RegisterDtoSchema.safeParse({ ...dto, acceptLlm: false }).success).toBe(false);
   });
 });

@@ -15,6 +15,10 @@ model User {
   company      Company? @relation(fields: [companyId], references: [id])
   refreshTokens RefreshToken[]
   createdAt    DateTime @default(now())
+  // Фиксация согласий при регистрации (152-ФЗ, ADR-033); null — старые пользователи
+  consentPdAt        DateTime? // согласие на обработку ПД (+ соглашение и политика)
+  consentLlmAt       DateTime? // отдельное согласие на передачу данных в LLM (Anthropic, США)
+  consentDocsVersion String?   // версия редакции документов, напр. "v1.0"
 }
 
 model RefreshToken {
@@ -94,7 +98,9 @@ enum GenStatus { PENDING ANALYZING GENERATING DONE FAILED }
 (ZodValidationPipe). Ошибки — единый формат `{ code, message, details? }`.
 
 ```
-POST /auth/register        { email, password } → 201 { user }
+POST /auth/register        { email, password, acceptTerms: true, acceptLlm: true } → 201 { user }
+                           // два РАЗДЕЛЬНЫХ обязательных согласия (ADR-033): literal(true),
+                           // отсутствие/false → 422; факт и версия фиксируются в User.consent*
 POST /auth/login           { email, password } → { accessToken } + set-cookie refresh
 POST /auth/refresh         (cookie) → { accessToken }
 POST /auth/logout          → 204, ревокация refresh
@@ -185,7 +191,14 @@ User = текст отзыва + рейтинг + источник.
 ## 5. Frontend — страницы и поведение
 
 ```
-/login /register          # формы, zod-валидация, ошибки под полями
+/login /register          # формы, zod-валидация, ошибки под полями;
+                          # на /register — два РАЗДЕЛЬНЫХ чекбокса согласий (ADR-033),
+                          # кнопка задизейблена, пока не отмечены оба
+/legal/[slug]             # публичные юридические документы (без авторизации):
+                          # privacy-policy | terms-of-service | consent-pd | consent-llm;
+                          # markdown из apps/web/content/legal/*.md, react-markdown без
+                          # raw-HTML, generateStaticParams, незнакомый slug → 404;
+                          # ссылки также в блоке «Документы» на /app/settings
 /onboarding               # 3 шага, сохранение по завершении; заменить access-токен в памяти
                           # на полученный из POST /company, затем redirect в /app
 /app                      # главный экран генерации

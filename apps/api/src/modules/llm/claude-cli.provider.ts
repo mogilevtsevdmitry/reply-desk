@@ -99,6 +99,18 @@ export class ClaudeCliProvider implements LlmProvider {
               );
               return;
             }
+            // ENOENT: бинаря claude нет в PATH (например, прод-контейнер) —
+            // читаемое сообщение вместо сырого spawn-error (генерация уйдёт в FAILED,
+            // лимит компенсируется штатно).
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+              reject(
+                new LlmNetworkError(
+                  'claude CLI не найден в PATH: нет ANTHROPIC_API_KEY и claude CLI недоступен. ' +
+                    'Установите Claude Code CLI или задайте ANTHROPIC_API_KEY.',
+                ),
+              );
+              return;
+            }
             reject(new LlmNetworkError(`claude-cli завершился с ошибкой: ${error.message}`));
             return;
           }

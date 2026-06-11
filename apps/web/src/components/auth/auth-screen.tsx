@@ -40,25 +40,46 @@ function validate(email: string, password: string): FieldErrors {
   return errors;
 }
 
+/** Ссылка на юридический документ из текста согласия — открывается в новой вкладке. */
+function LegalLink({ slug, children }: { slug: string; children: string }) {
+  return (
+    <a
+      href={`/legal/${slug}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-accent hover:underline"
+    >
+      {children}
+    </a>
+  );
+}
+
 export function AuthScreen({ mode }: { mode: Mode }) {
   const { setSession } = useAuth();
   const { showToast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // Два РАЗДЕЛЬНЫХ согласия (152-ФЗ): соглашение+ПД и трансграничная передача в LLM
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [acceptLlm, setAcceptLlm] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, setPending] = useState(false);
+
+  const consentsMissing = mode === 'signup' && (!acceptTerms || !acceptLlm);
 
   const handleSubmit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
     const fieldErrors = validate(email, password);
+    if (consentsMissing) fieldErrors.form = copy.errorConsentRequired;
     setErrors(fieldErrors);
-    if (fieldErrors.email || fieldErrors.password) return;
+    if (fieldErrors.email || fieldErrors.password || fieldErrors.form) return;
 
     setPending(true);
     try {
       const credentials = CredentialsSchema.parse({ email, password });
       if (mode === 'signup') {
-        await register(credentials);
+        // Контракт требует literal(true) — сюда попадаем только с двумя отметками
+        await register({ ...credentials, acceptTerms: true, acceptLlm: true });
       }
       const { accessToken } = await login(credentials);
       setSession(accessToken, credentials.email);
@@ -185,6 +206,42 @@ export function AuthScreen({ mode }: { mode: Mode }) {
               />
             </Field>
 
+            {mode === 'signup' ? (
+              <div className="mb-5 flex flex-col gap-3">
+                {/* Чекбокс 1: соглашение + политика + согласие на обработку ПД */}
+                <label className="flex cursor-pointer items-start gap-2.5 text-13 leading-normal text-ink-muted">
+                  <input
+                    type="checkbox"
+                    checked={acceptTerms}
+                    onChange={(e) => setAcceptTerms(e.target.checked)}
+                    className="mt-0.5 size-4 shrink-0 cursor-pointer accent-(--color-accent)"
+                  />
+                  <span>
+                    {copy.signupAcceptPrefix} <LegalLink slug="terms-of-service">{copy.signupAcceptTosLink}</LegalLink>{' '}
+                    {copy.signupAcceptAnd}{' '}
+                    <LegalLink slug="privacy-policy">{copy.signupAcceptPrivacyLink}</LegalLink>
+                    {copy.signupAcceptGive}{' '}
+                    <LegalLink slug="consent-pd">{copy.signupAcceptPdLink}</LegalLink>
+                  </span>
+                </label>
+
+                {/* Чекбокс 2: ОТДЕЛЬНОЕ согласие на трансграничную передачу в LLM */}
+                <label className="flex cursor-pointer items-start gap-2.5 text-13 leading-normal text-ink-muted">
+                  <input
+                    type="checkbox"
+                    checked={acceptLlm}
+                    onChange={(e) => setAcceptLlm(e.target.checked)}
+                    className="mt-0.5 size-4 shrink-0 cursor-pointer accent-(--color-accent)"
+                  />
+                  <span>
+                    {copy.signupLlmPrefix} <LegalLink slug="consent-llm">{copy.signupLlmLink}</LegalLink>
+                  </span>
+                </label>
+
+                <p className="m-0 text-12 leading-normal text-ink-faint">{copy.signupLlmNote}</p>
+              </div>
+            ) : null}
+
             {errors.form ? (
               <p role="alert" className="mb-4 text-13 text-danger">
                 {errors.form}
@@ -193,7 +250,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
 
             <button
               type="submit"
-              disabled={pending}
+              disabled={pending || consentsMissing}
               className="w-full cursor-pointer rounded-md bg-accent px-5 py-[13px] text-14 leading-none font-medium text-ink-on-accent transition-colors duration-[120ms] hover:bg-accent-hover active:bg-accent-down disabled:cursor-not-allowed disabled:opacity-60"
             >
               {mode === 'login' ? copy.loginSubmit : copy.signupSubmit}

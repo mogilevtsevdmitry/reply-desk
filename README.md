@@ -15,7 +15,8 @@ packages/config     eslint / tsconfig / tailwind-preset
 ## Запуск одной командой (docker compose)
 
 ```bash
-cp .env.example .env   # заполнить ANTHROPIC_API_KEY (или поставить LLM_PROVIDER=fake)
+cp .env.example .env   # заполнить ANTHROPIC_API_KEY (в контейнере LLM_PROVIDER=auto
+                       # без ключа упадёт — claude CLI там нет; либо LLM_PROVIDER=fake)
 docker compose -f docker/compose.yaml --env-file .env up --build -d
 ```
 
@@ -33,8 +34,10 @@ Dev-режим с hot-reload: добавить `-f docker/compose.dev.yaml`. Д�
 pnpm install
 
 # 2. Окружение
-cp .env.example .env   # заполнить JWT_ACCESS_SECRET, DATABASE_URL и ANTHROPIC_API_KEY
-                       # (или LLM_PROVIDER=fake — генерация без сети, для dev/QA)
+cp .env.example .env   # заполнить JWT_ACCESS_SECRET и DATABASE_URL.
+                       # LLM_PROVIDER=auto (дефолт, ADR-034): задан ANTHROPIC_API_KEY →
+                       # Anthropic API; ключа нет, но установлен Claude Code CLI →
+                       # claude-cli (dev). Явно: LLM_PROVIDER=fake — генерация без сети.
 
 # 3. БД и запуск
 pnpm --filter @replydesk/api prisma:migrate   # применяет миграции (+ pg_trgm)

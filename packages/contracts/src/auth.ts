@@ -6,7 +6,16 @@ export const CredentialsSchema = z.object({
   password: z.string().min(8).max(72),
 });
 
-export const RegisterDtoSchema = CredentialsSchema;
+/**
+ * Регистрация: помимо учётных данных — два РАЗДЕЛЬНЫХ обязательных согласия
+ * (юридическое требование, 152-ФЗ): acceptTerms — соглашение + политика +
+ * согласие на обработку ПД; acceptLlm — отдельное согласие на трансграничную
+ * передачу данных поставщику LLM (Anthropic, США). false/отсутствие → 422.
+ */
+export const RegisterDtoSchema = CredentialsSchema.extend({
+  acceptTerms: z.literal(true),
+  acceptLlm: z.literal(true),
+});
 export type RegisterDto = z.infer<typeof RegisterDtoSchema>;
 
 export const LoginDtoSchema = CredentialsSchema;

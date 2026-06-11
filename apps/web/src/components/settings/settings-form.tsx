@@ -23,6 +23,14 @@ const TONES: ReadonlyArray<{ value: ToneOfVoice['tone']; name: string; short: st
 const SAMPLE_LABELS = [copy.onbSample1Label, copy.onbSample2Label, copy.onbSample3Label];
 const SAMPLE_MAX = 1000;
 
+/** Блок «Документы»: ссылки на публичные юридические страницы /legal/[slug]. */
+const LEGAL_DOCS: ReadonlyArray<{ slug: string; title: string }> = [
+  { slug: 'terms-of-service', title: copy.legalTosTitle },
+  { slug: 'privacy-policy', title: copy.legalPrivacyTitle },
+  { slug: 'consent-pd', title: copy.legalConsentPdTitle },
+  { slug: 'consent-llm', title: copy.legalConsentLlmTitle },
+];
+
 export function SettingsPage() {
   const { data: company } = useCompanyMe();
   if (!company) return <div aria-busy="true" />;
@@ -201,6 +209,25 @@ function SettingsForm({ company }: { company: CompanyMeResponse }) {
             {settingsPlanNote(planLabel(company.plan), periodResetDate(usage.period))}
           </p>
         </div>
+      </div>
+
+      {/* Юридические документы (публичные страницы /legal/[slug]) */}
+      <div className="mb-6 rounded-lg border border-line bg-surface p-6 shadow-2">
+        <h2 className="m-0 mb-4 font-display text-22 font-normal">{copy.settingsDocsTitle}</h2>
+        <ul className="m-0 flex list-none flex-col gap-2 p-0 text-13">
+          {LEGAL_DOCS.map((doc) => (
+            <li key={doc.slug}>
+              <a
+                href={`/legal/${doc.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent hover:underline"
+              >
+                {doc.title}
+              </a>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="flex items-center gap-4">

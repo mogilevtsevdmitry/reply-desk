@@ -11,6 +11,7 @@ import {
   uniqueEmail,
 } from './helpers/api-helpers';
 import { cleanDatabase } from './helpers/db-helpers';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('Auth — интеграционные тесты', () => {
   let app: INestApplication;
@@ -35,7 +36,7 @@ describe('Auth — интеграционные тесты', () => {
     const email = uniqueEmail();
     const res = await request(app.getHttpServer())
       .post('/api/v1/auth/register')
-      .send({ email, password: 'Password123!' })
+      .send({ email, password: 'Password123!', acceptTerms: true, acceptLlm: true })
       .expect(201);
 
     const body = res.body as { user: { id: string; email: string; companyId: unknown } };
@@ -48,12 +49,12 @@ describe('Auth — интеграционные тесты', () => {
     const email = uniqueEmail();
     await request(app.getHttpServer())
       .post('/api/v1/auth/register')
-      .send({ email, password: 'Password123!' })
+      .send({ email, password: 'Password123!', acceptTerms: true, acceptLlm: true })
       .expect(201);
 
     const res = await request(app.getHttpServer())
       .post('/api/v1/auth/register')
-      .send({ email, password: 'AnotherPass123!' })
+      .send({ email, password: 'AnotherPass123!', acceptTerms: true, acceptLlm: true })
       .expect(409);
 
     const body = res.body as { code: string };
@@ -63,8 +64,54 @@ describe('Auth — интеграционные тесты', () => {
   it('регистрация: слабый пароль (< 8 символов) → 422', async () => {
     await request(app.getHttpServer())
       .post('/api/v1/auth/register')
-      .send({ email: uniqueEmail(), password: 'weak' })
+      .send({ email: uniqueEmail(), password: 'weak', acceptTerms: true, acceptLlm: true })
       .expect(422);
+  });
+
+  it('регистрация: без согласий (или с false) → 422', async () => {
+    // Оба согласия отсутствуют
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({ email: uniqueEmail(), password: 'Password123!' })
+      .expect(422);
+
+    // Нет согласия на LLM-передачу (чекбоксы раздельные — одного недостаточно)
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({ email: uniqueEmail(), password: 'Password123!', acceptTerms: true })
+      .expect(422);
+
+    // Нет согласия на обработку ПД
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({ email: uniqueEmail(), password: 'Password123!', acceptLlm: true })
+      .expect(422);
+
+    // false вместо true — тоже 422 (контракт: literal(true))
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({
+        email: uniqueEmail(),
+        password: 'Password123!',
+        acceptTerms: true,
+        acceptLlm: false,
+      })
+      .expect(422);
+  });
+
+  it('регистрация: факт согласий фиксируется в БД (consentPdAt/consentLlmAt/версия)', async () => {
+    const email = uniqueEmail();
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({ email, password: 'Password123!', acceptTerms: true, acceptLlm: true })
+      .expect(201);
+
+    const userId = (res.body as { user: { id: string } }).user.id;
+    const prisma = app.get(PrismaService);
+    const dbUser = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    expect(dbUser.consentPdAt).toBeInstanceOf(Date);
+    expect(dbUser.consentLlmAt).toBeInstanceOf(Date);
+    expect(dbUser.consentDocsVersion).toBe('v1.0');
   });
 
   // -------------------------------------------------------------------------
@@ -75,7 +122,7 @@ describe('Auth — интеграционные тесты', () => {
     const email = uniqueEmail();
     await request(app.getHttpServer())
       .post('/api/v1/auth/register')
-      .send({ email, password: 'Password123!' });
+      .send({ email, password: 'Password123!', acceptTerms: true, acceptLlm: true });
 
     const res = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
@@ -92,7 +139,7 @@ describe('Auth — интеграционные тесты', () => {
     const email = uniqueEmail();
     await request(app.getHttpServer())
       .post('/api/v1/auth/register')
-      .send({ email, password: 'Password123!' });
+      .send({ email, password: 'Password123!', acceptTerms: true, acceptLlm: true });
 
     const res = await request(app.getHttpServer())
       .post('/api/v1/auth/login')

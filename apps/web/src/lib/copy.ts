@@ -30,6 +30,19 @@ export const copy = {
   signupSwitchText: 'Уже зарегистрированы?',
   signupSwitchLink: 'Войдите',
 
+  // Согласия при регистрации (152-ФЗ): два РАЗДЕЛЬНЫХ чекбокса, оба обязательны
+  signupAcceptPrefix: 'Принимаю',
+  signupAcceptTosLink: 'пользовательское соглашение',
+  signupAcceptAnd: 'и',
+  signupAcceptPrivacyLink: 'политику обработки персональных данных',
+  signupAcceptGive: ', даю',
+  signupAcceptPdLink: 'согласие на обработку персональных данных',
+  signupLlmPrefix: 'Даю',
+  signupLlmLink: 'согласие на передачу данных из отзывов в LLM Anthropic (США)',
+  signupLlmNote:
+    'Чтобы собрать ответ, тексты отзывов и данные клиентов передаются на серверы Anthropic в США — за пределы РФ, где уровень защиты данных может отличаться от российского. Без этой передачи сервис работать не может.',
+  errorConsentRequired: 'Отметьте оба согласия — без них создать аккаунт не получится',
+
   errorFieldRequired: 'Заполните это поле',
   errorEmailInvalid: 'Проверьте адрес — похоже, он неполный',
   errorEmailTaken: 'Эта почта уже зарегистрирована — попробуйте войти',
@@ -192,6 +205,12 @@ export const copy = {
   settingsSamplesLabel: 'Примеры ваших текстов',
   settingsSamplesHint: 'AI опирается на эти примеры, чтобы звучать как вы, а не как робот',
   settingsPlanTitle: 'Тариф',
+  settingsDocsTitle: 'Документы',
+  legalTosTitle: 'Пользовательское соглашение',
+  legalPrivacyTitle: 'Политика обработки персональных данных',
+  legalConsentPdTitle: 'Согласие на обработку персональных данных',
+  legalConsentLlmTitle: 'Согласие на передачу данных в LLM Anthropic (США)',
+  legalBack: '← Назад',
   settingsSave: 'Сохранить настройки',
   settingsSaveNote: 'Прошлые генерации не изменятся',
   toastSettingsSaved: 'Настройки сохранены — применятся к новым генерациям',
@@ -289,6 +308,10 @@ export const limitCtaToast = (email: string): string =>
 /** settings-plan-note. */
 export const settingsPlanNote = (plan: string, date: string): string =>
   `Тариф ${plan}. Счётчик обнулится ${date}. Платные тарифы появятся позже — мы напишем вам на почту.`;
+
+/** legal-edition: «Редакция {version} от {updated}» (шапка /legal/[slug]). */
+export const legalEdition = (version: string, updated: string): string =>
+  `Редакция ${version} от ${updated}`;
 
 /** result-meta: «{source} · {date}». */
 export const resultMeta = (source: string, date: string): string => `${source} · ${date}`;

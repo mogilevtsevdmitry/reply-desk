@@ -31,7 +31,7 @@ async function apiRegister(email: string, password: string): Promise<boolean> {
   const res = await fetch(`${API_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, acceptTerms: true, acceptLlm: true }),
   });
   if (res.status === 409) return false; // already exists
   if (!res.ok) {

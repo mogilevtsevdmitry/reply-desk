@@ -18,6 +18,12 @@ model User {
   company       Company?       @relation(fields: [companyId], references: [id])
   refreshTokens RefreshToken[]
   createdAt     DateTime       @default(now())
+
+  // Фиксация фактов согласий при регистрации (доказуемость, 152-ФЗ).
+  // Nullable: пользователи, созданные до введения согласий.
+  consentPdAt        DateTime? // согласие на обработку ПД (+ соглашение и политика)
+  consentLlmAt       DateTime? // отдельное согласие на передачу данных в LLM (Anthropic, США)
+  consentDocsVersion String? // версия редакции юридических документов, например "v1.0"
 }
 
 model RefreshToken {

@@ -26,7 +26,7 @@ export async function apiRegisterAndLogin(
   const regRes = await fetch(`${API_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, acceptTerms: true, acceptLlm: true }),
   });
   if (!regRes.ok && regRes.status !== 409) {
     throw new Error(`Register failed: ${regRes.status} ${await regRes.text()}`);

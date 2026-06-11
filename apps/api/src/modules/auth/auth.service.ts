@@ -11,6 +11,13 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 export const BCRYPT_COST = 12;
 
+/**
+ * Версия редакции юридических документов, которую принимает пользователь
+ * при регистрации (apps/web/content/legal/*, frontmatter `version`).
+ * При выпуске новой редакции — поднять синхронно с документами.
+ */
+export const CONSENT_DOCS_VERSION = 'v1.0';
+
 export interface IssuedTokens {
   accessToken: string;
   refreshToken: string;
@@ -39,8 +46,17 @@ export class AuthService {
       throw new AppException('EMAIL_TAKEN', 'Этот email уже зарегистрирован', 409);
     }
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST);
+    // Фиксируем факты согласий (152-ФЗ, доказуемость): контракт гарантирует
+    // acceptTerms/acceptLlm === true; время и версия документов — в БД, не в логах.
+    const consentAt = new Date();
     const user = await this.prisma.user.create({
-      data: { email: dto.email, passwordHash },
+      data: {
+        email: dto.email,
+        passwordHash,
+        consentPdAt: consentAt,
+        consentLlmAt: consentAt,
+        consentDocsVersion: CONSENT_DOCS_VERSION,
+      },
     });
     return this.toUserDto(user);
   }

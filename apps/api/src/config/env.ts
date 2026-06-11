@@ -22,10 +22,15 @@ export const EnvSchema = z.object({
   LIMIT_BUSINESS: z.coerce.number().int().positive().default(1000),
 
   // --- AI-слой и конвейер генерации (задача 2.2) ---
+  // auto — дефолт (ADR-034): есть непустой ANTHROPIC_API_KEY → anthropic, иначе claude-cli;
   // fake — детерминированный FakeLlmProvider без сети (dev/QA, ADR-019);
   // claude-cli — локальный Claude Code CLI по подписке, dev-only (ADR-031)
-  LLM_PROVIDER: z.enum(['anthropic', 'fake', 'claude-cli']).default('anthropic'),
-  ANTHROPIC_API_KEY: z.string().optional(),
+  LLM_PROVIDER: z.enum(['auto', 'anthropic', 'fake', 'claude-cli']).default('auto'),
+  // Пустая строка = ключ не задан (в .env часто остаётся `ANTHROPIC_API_KEY=`)
+  ANTHROPIC_API_KEY: z
+    .string()
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
   ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-5'),
   // Модель для LLM_PROVIDER=claude-cli (алиасы CLI: sonnet | opus | haiku)
   CLAUDE_CLI_MODEL: z.string().default('sonnet'),
