@@ -106,3 +106,18 @@ describe('CompanyService — онбординг (ADR-005)', () => {
     expect(auth.signAccessToken).not.toHaveBeenCalled();
   });
 });
+
+describe('CompanyService.update — редактируемая ниша (ADR-032)', () => {
+  it('PATCH с niche сохраняет нишу; не переданные поля не попадают в data', async () => {
+    const tx = makeTx('c1');
+    const prisma = makePrisma(tx);
+    const service = new CompanyService(prisma, makeAuth() as unknown as AuthService, makeUsage());
+
+    await service.update('c1', { niche: 'HOOKAH' });
+
+    expect(prisma.company.update).toHaveBeenCalledWith({
+      where: { id: 'c1' },
+      data: { niche: 'HOOKAH' },
+    });
+  });
+});

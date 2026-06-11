@@ -54,13 +54,14 @@ export const CreateCompanyResponseSchema = z.object({
 });
 export type CreateCompanyResponse = z.infer<typeof CreateCompanyResponseSchema>;
 
-/** PATCH /company/me. Ниша и тариф через этот эндпоинт не меняются. */
+/** PATCH /company/me. Ниша редактируема (ADR-032); тариф через этот эндпоинт не меняется. */
 export const UpdateCompanyDtoSchema = z
   .object({
     name: z.string().trim().min(1).max(200).optional(),
+    niche: NicheSchema.optional(),
     toneOfVoice: ToneOfVoiceSchema.optional(),
   })
-  .refine((v) => v.name !== undefined || v.toneOfVoice !== undefined, {
+  .refine((v) => v.name !== undefined || v.niche !== undefined || v.toneOfVoice !== undefined, {
     message: 'Нужно передать хотя бы одно поле',
   });
 export type UpdateCompanyDto = z.infer<typeof UpdateCompanyDtoSchema>;

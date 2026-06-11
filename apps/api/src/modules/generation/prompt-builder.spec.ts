@@ -128,6 +128,7 @@ describe('buildSystemPrompt — порядок секций', () => {
     writeFileSync(join(promptsDir, 'fake-detection.md'), '# FAKE-SECTION\n\nпризнаки');
     mkdirSync(join(promptsDir, 'niches'));
     writeFileSync(join(promptsDir, 'niches', 'salon.md'), '# NICHE-SALON\n\nниша');
+    writeFileSync(join(promptsDir, 'niches', 'hookah.md'), '# NICHE-HOOKAH\n\nниша');
   });
 
   afterAll(() => {
@@ -157,6 +158,19 @@ describe('buildSystemPrompt — порядок секций', () => {
 
     expect(order.every((idx) => idx >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it('ниша HOOKAH резолвится в niches/hookah.md (ADR-032)', () => {
+    const system = buildSystemPrompt({
+      promptsDir,
+      niche: 'HOOKAH',
+      source: 'OTHER',
+      companyName: 'Кальянная',
+      toneOfVoice: TONE,
+      candidates: [],
+    });
+    expect(system).toContain('# NICHE-HOOKAH');
+    expect(system).not.toContain('# NICHE-SALON');
   });
 
   it('без кандидатов блок похожих отзывов отсутствует', () => {

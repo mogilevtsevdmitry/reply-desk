@@ -1,6 +1,6 @@
 'use client';
 
-import type { CompanyMeResponse, ToneOfVoice } from '@replydesk/contracts';
+import { NicheSchema, type CompanyMeResponse, type Niche, type ToneOfVoice } from '@replydesk/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { isApiError } from '@/lib/api/client';
@@ -34,6 +34,7 @@ function SettingsForm({ company }: { company: CompanyMeResponse }) {
   const queryClient = useQueryClient();
 
   const [name, setName] = useState(company.name);
+  const [niche, setNiche] = useState<Niche>(company.niche);
   const [tone, setTone] = useState<ToneOfVoice['tone']>(company.toneOfVoice.tone);
   const [avoid, setAvoid] = useState(company.toneOfVoice.avoid ?? '');
   const [samples, setSamples] = useState<string[]>([
@@ -66,6 +67,7 @@ function SettingsForm({ company }: { company: CompanyMeResponse }) {
     setNameError(null);
     mutation.mutate({
       name: name.trim(),
+      niche,
       toneOfVoice: {
         tone,
         examples: samples.map((s) => s.trim()).filter(Boolean),
@@ -97,9 +99,17 @@ function SettingsForm({ company }: { company: CompanyMeResponse }) {
           />
         </Field>
         <Field label={copy.settingsNicheLabel} htmlFor="set-niche" hint={copy.settingsNicheHint}>
-          {/* Ниша через PATCH /company/me не меняется (контракт, ADR-018) */}
-          <Select id="set-niche" value={company.niche} disabled>
-            <option value={company.niche}>{nicheLabels[company.niche]}</option>
+          {/* Ниша редактируема (ADR-032): подключает отраслевые правила генерации */}
+          <Select
+            id="set-niche"
+            value={niche}
+            onChange={(e) => setNiche(NicheSchema.parse(e.target.value))}
+          >
+            {NicheSchema.options.map((n) => (
+              <option key={n} value={n}>
+                {nicheLabels[n]}
+              </option>
+            ))}
           </Select>
         </Field>
       </div>

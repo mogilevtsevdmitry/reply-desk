@@ -74,6 +74,7 @@ export class CompanyService {
       where: { id: companyId },
       data: {
         ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.niche !== undefined ? { niche: dto.niche } : {}),
         ...(dto.toneOfVoice !== undefined
           ? { toneOfVoice: dto.toneOfVoice as Prisma.InputJsonObject }
           : {}),

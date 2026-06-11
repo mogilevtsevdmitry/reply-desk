@@ -96,6 +96,7 @@ docs/design/*.html действует этот файл (см. список ра
 | `niche-auto` | Автосервис | enum AUTO |
 | `niche-fitness` | Фитнес | enum FITNESS |
 | `niche-medical` | Медицинская клиника | enum MEDICAL; в прототипе отсутствует — добавлено (ADR-009) |
+| `niche-hookah` | Кальянная и бар | enum HOOKAH; добавлено по фидбэку владельца (ADR-032) |
 | `niche-other` | Другое | enum OTHER |
 
 ### Шаг 2 — тон бренда
@@ -371,8 +372,8 @@ docs/design/*.html действует этот файл (см. список ра
 | `settings-sub` | Компания, голос бренда и тариф — изменения применяются к новым генерациям | |
 | `settings-company-title` | Компания | заголовок секции |
 | `settings-company-name-label` | Название | |
-| `settings-niche-label` | Ниша | select, опции `niche-*` из блока 2 (все 7) |
-| `settings-niche-hint` | Смена ниши подключает другие отраслевые правила для ответов | |
+| `settings-niche-label` | Ниша | select, опции `niche-*` из блока 2 (все 8); редактируема (ADR-032) |
+| `settings-niche-hint` | Смена ниши подключает другие отраслевые правила для ответов | ниша влияет на стиль и нормы генерируемых ответов |
 | `settings-tone-title` | Тон бренда | заголовок секции |
 | `settings-tone-label` | Тон по умолчанию | radiogroup; названия — `tone-*-name` из блока 2 |
 | `settings-tone-soft-short` | Сопереживаем, извиняемся первыми | краткие описания для компактных карточек |

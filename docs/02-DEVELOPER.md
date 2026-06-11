@@ -37,7 +37,7 @@ model Company {
   createdAt   DateTime @default(now())
 }
 
-enum Niche { SALON DENTAL RESTO AUTO FITNESS MEDICAL OTHER }
+enum Niche { SALON DENTAL RESTO AUTO FITNESS MEDICAL HOOKAH OTHER }
 enum Plan  { FREE START BUSINESS }
 
 model UsageCounter {           // лимиты генераций
@@ -103,7 +103,8 @@ GET  /company/me           → Company
 POST /company              { name, niche, toneOfVoice } → { company, accessToken }
                            // онбординг, один раз; возвращает НОВЫЙ access-токен с companyId
                            // (токен, выданный при регистрации, содержит companyId=null)
-PATCH /company/me          { name?, toneOfVoice? } → Company
+PATCH /company/me          { name?, niche?, toneOfVoice? } → Company
+                           // ниша редактируема (ADR-032): влияет на промпт следующих генераций
 
 POST /reviews              { source, rating?, authorName?, rawText } → 202 { reviewId, generationId }
                            // authorName — имя клиента, опционально, trim, ≤ 100 символов (ADR-024)
@@ -161,7 +162,7 @@ prompts/
 ├── platforms.md       # правила площадок (Яндекс: без ссылок и телефонов; WB/Ozon: лимиты длины…)
 ├── fake-detection.md  # признаки заказного отзыва
 └── niches/
-    ├── salon.md  dental.md  resto.md  auto.md  fitness.md  medical.md  other.md
+    ├── salon.md  dental.md  resto.md  auto.md  fitness.md  medical.md  hookah.md  other.md
 ```
 
 System = base.md + niches/{niche}.md + platforms.md (секция площадки) + fake-detection.md

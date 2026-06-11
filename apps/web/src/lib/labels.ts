@@ -9,6 +9,7 @@ export const nicheLabels: Record<Niche, string> = {
   AUTO: 'Автосервис',
   FITNESS: 'Фитнес',
   MEDICAL: 'Медицинская клиника',
+  HOOKAH: 'Кальянная и бар',
   OTHER: 'Другое',
 };
 

@@ -8,6 +8,7 @@ export const NicheSchema = z.enum([
   'AUTO',
   'FITNESS',
   'MEDICAL',
+  'HOOKAH',
   'OTHER',
 ]);
 export type Niche = z.infer<typeof NicheSchema>;
