@@ -14,7 +14,7 @@ import { AppException } from '../../common/app.exception';
 import type { Env } from '../../config/env';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UsageService } from '../usage/usage.service';
-import { computeRefund } from './prorata';
+import { computeRefund, isFullRefundEligible } from './prorata';
 import { YooKassaClient } from './yookassa.client';
 import { buildReceipt, kopecksToYkValue } from './yookassa.types';
 import type { YkPayment, YkWebhookEvent } from './yookassa.types';
@@ -405,10 +405,11 @@ export class BillingService {
   // ---------- POST /billing/cancel ----------
 
   /**
-   * Отмена подписки с pro-rata возвратом (ADR-036): compare-and-swap
-   * ACTIVE → EXPIRED (двойной клик не даёт второго возврата), расчёт по
-   * фактическим дням с cap на исходную оплату, refund через ЮKassa;
-   * при отказе ЮKassa — откат подписки и плана.
+   * Отмена подписки с возвратом: правило 24 часов (ADR-041) — отмена в течение
+   * суток после оплаты без использованных генераций возвращает полную сумму
+   * платежа; иначе pro-rata (ADR-036) по фактическим дням с cap на исходную
+   * оплату. Compare-and-swap ACTIVE → EXPIRED (двойной клик не даёт второго
+   * возврата), refund через ЮKassa; при отказе ЮKassa — откат подписки и плана.
    */
   async cancel(companyId: string): Promise<CancelSubscriptionResponse> {
     const now = new Date();
@@ -422,15 +423,27 @@ export class BillingService {
       orderBy: { paidAt: 'desc' },
     });
 
-    const refund = computeRefund({
+    const fullRefund =
+      lastPayment?.paidAt != null &&
+      isFullRefundEligible({
+        paidAt: lastPayment.paidAt,
+        now,
+        usedGenerations: await this.countUsedGenerationsSince(companyId, lastPayment.paidAt),
+      });
+
+    const prorata = computeRefund({
       price: lastPayment?.amount ?? sub.price,
       paidAt: lastPayment?.paidAt ?? sub.startedAt,
       expiresAt: sub.expiresAt,
       now,
     });
+    const refundAmount = fullRefund ? lastPayment.amount : prorata.amount;
+    const refundDescription = fullRefund
+      ? 'Полный возврат (отмена в течение 24 часов)'
+      : `Возврат за неиспользованный период подписки (${prorata.daysLeft} из ${prorata.totalDays} дн.)`;
 
     // Возврат денег требует сконфигурированной ЮKassa — проверяем ДО CAS.
-    if (refund.amount > 0 && lastPayment?.providerPaymentId && !this.yookassa.isConfigured()) {
+    if (refundAmount > 0 && lastPayment?.providerPaymentId && !this.yookassa.isConfigured()) {
       throw new AppException('BILLING_DISABLED', 'Оплата временно недоступна', 503);
     }
 
@@ -450,7 +463,7 @@ export class BillingService {
     }
     await this.prisma.company.update({ where: { id: companyId }, data: { plan: 'FREE' } });
 
-    if (refund.amount === 0 || !lastPayment?.providerPaymentId) {
+    if (refundAmount === 0 || !lastPayment?.providerPaymentId) {
       return { refundAmount: 0 };
     }
 
@@ -459,9 +472,9 @@ export class BillingService {
       data: {
         companyId,
         type: 'REFUND',
-        amount: refund.amount,
+        amount: refundAmount,
         status: 'PENDING',
-        description: `Возврат за неиспользованный период подписки (${refund.daysLeft} из ${refund.totalDays} дн.)`,
+        description: refundDescription,
       },
     });
 
@@ -469,7 +482,7 @@ export class BillingService {
       const ykRefund = await this.yookassa.refundPayment(
         {
           payment_id: lastPayment.providerPaymentId,
-          amount: { value: kopecksToYkValue(refund.amount), currency: 'RUB' },
+          amount: { value: kopecksToYkValue(refundAmount), currency: 'RUB' },
           description: `Refund for txn ${lastPayment.id}`,
         },
         refundTxn.id,
@@ -516,7 +529,22 @@ export class BillingService {
       throw new AppException('INTERNAL', 'Не удалось выполнить возврат — попробуйте позже', 502);
     }
 
-    return { refundAmount: refund.amount };
+    return { refundAmount };
+  }
+
+  /**
+   * «Использованные генерации» для правила 24 часов (ADR-041): Generation
+   * компании (через relation Review → companyId), созданные после paidAt,
+   * со статусом != FAILED — FAILED компенсирует лимит, ценность не получена.
+   */
+  private async countUsedGenerationsSince(companyId: string, since: Date): Promise<number> {
+    return this.prisma.generation.count({
+      where: {
+        review: { companyId },
+        createdAt: { gt: since },
+        status: { not: 'FAILED' },
+      },
+    });
   }
 
   // ---------- POST /billing/cron/renewals ----------

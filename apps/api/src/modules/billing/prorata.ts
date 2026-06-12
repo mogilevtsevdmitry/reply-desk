@@ -1,5 +1,29 @@
 const MS_PER_DAY = 86_400_000;
 
+/** Окно полного возврата при отмене подписки после оплаты (ADR-041). */
+export const FULL_REFUND_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Правило 24 часов (ADR-041): отмена подписки в течение 24 часов с момента
+ * оплаты БЕЗ использованных генераций → возврат полной суммы платежа.
+ *
+ * «Использованные генерации» — Generation компании с createdAt > paidAt и
+ * status != FAILED (FAILED компенсирует лимит, ценность не получена; PENDING/
+ * ANALYZING/GENERATING/DONE — использование). Подсчёт делает вызывающий код —
+ * функция чистая и юнит-тестируемая. Clock skew (now < paidAt) → false:
+ * сработает pro-rata, который и так cap'ится полной суммой.
+ */
+export function isFullRefundEligible(input: {
+  /** Момент оплаты (paidAt последней SUCCEEDED-транзакции подписки). */
+  paidAt: Date;
+  now: Date;
+  /** Генерации компании после paidAt со статусом != FAILED. */
+  usedGenerations: number;
+}): boolean {
+  const ageMs = input.now.getTime() - input.paidAt.getTime();
+  return input.usedGenerations === 0 && ageMs >= 0 && ageMs < FULL_REFUND_WINDOW_MS;
+}
+
 /**
  * Pro-rata расчёт возврата за неиспользованную часть оплаченного периода (ADR-036).
  *

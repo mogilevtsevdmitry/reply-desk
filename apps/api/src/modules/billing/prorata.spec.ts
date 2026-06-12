@@ -1,4 +1,4 @@
-import { computeRefund } from './prorata';
+import { computeRefund, isFullRefundEligible } from './prorata';
 
 /**
  * Pro-rata возврат (ADR-036): по фактическим дням оплаченного периода
@@ -98,5 +98,50 @@ describe('computeRefund — pro-rata возврат за подписку', () =
     });
     expect(r.totalDays).toBe(1);
     expect(r.amount).toBe(0);
+  });
+});
+
+/**
+ * Правило 24 часов (ADR-041): отмена в течение суток после оплаты без
+ * использованных генераций → полный возврат; иначе — pro-rata.
+ */
+describe('isFullRefundEligible — правило 24 часов', () => {
+  const D = (iso: string) => new Date(iso);
+  const paidAt = D('2026-06-12T10:00:00Z');
+
+  it('отмена через минуту без генераций → полный возврат', () => {
+    expect(
+      isFullRefundEligible({ paidAt, now: D('2026-06-12T10:01:00Z'), usedGenerations: 0 }),
+    ).toBe(true);
+  });
+
+  it('отмена в течение 24 часов, но генерации были → pro-rata', () => {
+    expect(
+      isFullRefundEligible({ paidAt, now: D('2026-06-12T10:01:00Z'), usedGenerations: 1 }),
+    ).toBe(false);
+  });
+
+  it('отмена позже 24 часов без генераций → pro-rata', () => {
+    expect(
+      isFullRefundEligible({ paidAt, now: D('2026-06-13T10:00:01Z'), usedGenerations: 0 }),
+    ).toBe(false);
+  });
+
+  it('граница: ровно 24 часа → окно закрыто (строго меньше)', () => {
+    expect(
+      isFullRefundEligible({ paidAt, now: D('2026-06-13T10:00:00Z'), usedGenerations: 0 }),
+    ).toBe(false);
+  });
+
+  it('за секунду до границы 24 часов → полный возврат', () => {
+    expect(
+      isFullRefundEligible({ paidAt, now: D('2026-06-13T09:59:59Z'), usedGenerations: 0 }),
+    ).toBe(true);
+  });
+
+  it('clock skew: now раньше paidAt → не full (отработает pro-rata с cap)', () => {
+    expect(
+      isFullRefundEligible({ paidAt, now: D('2026-06-12T09:59:59Z'), usedGenerations: 0 }),
+    ).toBe(false);
   });
 });

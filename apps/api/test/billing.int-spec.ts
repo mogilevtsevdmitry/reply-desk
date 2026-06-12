@@ -330,7 +330,7 @@ describe('Биллинг ЮKassa (интеграция)', () => {
     expect((res.body as { code: string }).code).toBe('LIMIT_EXCEEDED');
   });
 
-  it('cancel: pro-rata возврат, подписка EXPIRED, план FREE, транзакции REFUND/REFUNDED', async () => {
+  it('cancel без генераций в течение 24ч: полный возврат 790,00, подписка EXPIRED, план FREE, транзакции REFUND/REFUNDED', async () => {
     const user = await registerAndOnboard(app);
     const { transactionId } = await paySubscription(user, 'START', 1);
 
@@ -340,9 +340,8 @@ describe('Биллинг ЮKassa (интеграция)', () => {
       .expect(200);
     const { refundAmount } = res.body as { refundAmount: number };
 
-    // Месяц только начался: возврат почти полный, но не больше оплаты (cap)
-    expect(refundAmount).toBeGreaterThan(0);
-    expect(refundAmount).toBeLessThanOrEqual(79_000);
+    // Правило 24 часов (ADR-041): генераций после оплаты не было → полная сумма
+    expect(refundAmount).toBe(79_000);
 
     const sub = await prisma.subscription.findUniqueOrThrow({
       where: { companyId: user.companyId },
@@ -358,7 +357,8 @@ describe('Биллинг ЮKassa (интеграция)', () => {
       where: { companyId: user.companyId, type: 'REFUND' },
     });
     expect(refundTxn.status).toBe('SUCCEEDED');
-    expect(refundTxn.amount).toBe(refundAmount);
+    expect(refundTxn.amount).toBe(79_000);
+    expect(refundTxn.description).toContain('Полный возврат (отмена в течение 24 часов)');
 
     const original = await prisma.paymentTransaction.findUniqueOrThrow({
       where: { id: transactionId },
@@ -367,12 +367,89 @@ describe('Биллинг ЮKassa (интеграция)', () => {
 
     // Сумма возврата ушла в ЮKassa с Idempotence-Key = id REFUND-транзакции
     expect(yk.refundCalls[0]!.idempotenceKey).toBe(refundTxn.id);
+    expect(yk.refundCalls[0]!.input['amount']).toEqual({ value: '790.00', currency: 'RUB' });
 
     // Повторная отмена → 409
     await api()
       .post('/api/v1/billing/cancel')
       .set('Authorization', `Bearer ${user.companyToken}`)
       .expect(409);
+  });
+
+  it('cancel с генерацией после оплаты (в течение 24ч): pro-rata, начатый день сгорает', async () => {
+    const user = await registerAndOnboard(app);
+    await paySubscription(user, 'START', 1);
+
+    // Использованная генерация после оплаты (status != FAILED) — через relation Review
+    await prisma.review.create({
+      data: {
+        companyId: user.companyId,
+        source: 'YANDEX_MAPS',
+        rawText: 'Отличный сервис!',
+        generation: { create: { status: 'DONE' } },
+      },
+    });
+
+    const res = await api()
+      .post('/api/v1/billing/cancel')
+      .set('Authorization', `Bearer ${user.companyToken}`)
+      .expect(200);
+    const { refundAmount } = res.body as { refundAmount: number };
+
+    // Генерация была → действующий pro-rata: начатый день считается использованным
+    expect(refundAmount).toBeGreaterThan(0);
+    expect(refundAmount).toBeLessThan(79_000);
+
+    const refundTxn = await prisma.paymentTransaction.findFirstOrThrow({
+      where: { companyId: user.companyId, type: 'REFUND' },
+    });
+    expect(refundTxn.amount).toBe(refundAmount);
+    expect(refundTxn.description).toContain('Возврат за неиспользованный период подписки');
+  });
+
+  it('cancel: FAILED-генерация не считается использованием → полный возврат', async () => {
+    const user = await registerAndOnboard(app);
+    await paySubscription(user, 'START', 1);
+
+    await prisma.review.create({
+      data: {
+        companyId: user.companyId,
+        source: 'YANDEX_MAPS',
+        rawText: 'Отзыв, генерация по которому упала',
+        generation: { create: { status: 'FAILED', error: 'LLM timeout' } },
+      },
+    });
+
+    const res = await api()
+      .post('/api/v1/billing/cancel')
+      .set('Authorization', `Bearer ${user.companyToken}`)
+      .expect(200);
+    expect((res.body as { refundAmount: number }).refundAmount).toBe(79_000);
+  });
+
+  it('cancel позже 24 часов после оплаты: pro-rata несмотря на отсутствие генераций', async () => {
+    const user = await registerAndOnboard(app);
+    await paySubscription(user, 'START', 1);
+
+    // «Состариваем» оплату: paidAt 25 часов назад (окно 24ч закрыто)
+    const paidAt = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    await prisma.paymentTransaction.updateMany({
+      where: { companyId: user.companyId, type: 'SUBSCRIPTION', status: 'SUCCEEDED' },
+      data: { paidAt },
+    });
+
+    const res = await api()
+      .post('/api/v1/billing/cancel')
+      .set('Authorization', `Bearer ${user.companyToken}`)
+      .expect(200);
+    const { refundAmount } = res.body as { refundAmount: number };
+    expect(refundAmount).toBeGreaterThan(0);
+    expect(refundAmount).toBeLessThan(79_000);
+
+    const refundTxn = await prisma.paymentTransaction.findFirstOrThrow({
+      where: { companyId: user.companyId, type: 'REFUND' },
+    });
+    expect(refundTxn.description).toContain('Возврат за неиспользованный период подписки');
   });
 
   it('отказ ЮKassa в возврате откатывает подписку и план (деньги не двигались)', async () => {
