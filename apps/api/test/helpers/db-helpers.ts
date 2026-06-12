@@ -9,7 +9,7 @@ export async function cleanDatabase(app: INestApplication): Promise<void> {
   const prisma = app.get(PrismaService);
   // Используем raw SQL TRUNCATE с каскадом — надёжнее цепочки deleteMany с FK
   await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE "Generation", "UsageCounter", "Review", "RefreshToken", "User", "Company" RESTART IDENTITY CASCADE`,
+    `TRUNCATE TABLE "Generation", "UsageCounter", "Review", "RefreshToken", "PaymentTransaction", "Subscription", "User", "Company" RESTART IDENTITY CASCADE`,
   );
 }
 

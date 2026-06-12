@@ -6,7 +6,7 @@
  * сообщает об отсутствии записей — guard пропускает все запросы.
  */
 import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import cookieParser from 'cookie-parser';
 import { AppModule } from '../../src/app.module';
@@ -26,13 +26,19 @@ class NoopThrottlerStorage implements ThrottlerStorage {
   }
 }
 
-export async function createTestApp(): Promise<INestApplication> {
-  const moduleRef = await Test.createTestingModule({
+export async function createTestApp(
+  /** Дополнительные override'ы DI (например, мок YooKassaClient для биллинга). */
+  customize?: (builder: TestingModuleBuilder) => TestingModuleBuilder,
+): Promise<INestApplication> {
+  let builder = Test.createTestingModule({
     imports: [AppModule],
   })
     .overrideProvider(ThrottlerStorage)
-    .useClass(NoopThrottlerStorage)
-    .compile();
+    .useClass(NoopThrottlerStorage);
+  if (customize) {
+    builder = customize(builder);
+  }
+  const moduleRef = await builder.compile();
 
   const app = moduleRef.createNestApplication();
   app.setGlobalPrefix('api/v1');

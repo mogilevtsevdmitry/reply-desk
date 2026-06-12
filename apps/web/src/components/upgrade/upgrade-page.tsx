@@ -1,21 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { copy, limitCtaToast, limitText, limitTitle } from '@/lib/copy';
-import { useAuth } from '@/lib/auth/auth-context';
+import { copy, limitText, limitTitle } from '@/lib/copy';
 import { periodAccusative, periodResetDate, planLabel } from '@/lib/format';
 import { useCompanyMe } from '@/lib/hooks';
-import { Button } from '../ui/button';
-import { useToast } from '../ui/toast';
 
 /**
- * Экран 402 — лимит исчерпан (заглушка апгрейда, ADR-012):
- * только известные факты (лимиты тарифов), без цен; CTA — заглушка с тостом.
+ * Экран 402 — лимит исчерпан (ADR-012, обновлён под биллинг ADR-035..039):
+ * только известные факты (лимиты тарифов); CTA ведёт на /app/billing.
  */
 export function UpgradePage() {
   const { data: company } = useCompanyMe();
-  const { email } = useAuth();
-  const { showToast } = useToast();
 
   if (!company) return <div aria-busy="true" />;
 
@@ -43,12 +38,12 @@ export function UpgradePage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button
-          variant="primary"
-          onClick={() => showToast(limitCtaToast(email ?? 'вашу почту'))}
+        <Link
+          href="/app/billing"
+          className="inline-flex rounded-md bg-accent px-5 py-[13px] text-14 leading-none font-medium text-ink-on-accent transition-colors duration-[120ms] hover:bg-accent-hover"
         >
-          {copy.limitCta}
-        </Button>
+          {copy.limitCtaLink}
+        </Link>
         <Link
           href="/app/history"
           className="inline-flex rounded-md border border-line-strong px-5 py-[13px] text-14 leading-none font-medium text-ink transition-colors duration-[120ms] hover:bg-surface-2"

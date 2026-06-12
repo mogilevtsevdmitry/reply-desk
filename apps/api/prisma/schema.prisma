@@ -41,10 +41,76 @@ model Company {
   niche       Niche
   plan        Plan           @default(FREE)
   toneOfVoice Json // { tone: "soft|neutral|premium", examples: string[] (до 3, по 1000 симв.), avoid? }
+  // Остаток разовых пакетных генераций (не сгорают, ADR-036).
+  // Списываются ПОСЛЕ исчерпания месячного лимита тарифа.
+  packageCredits Int                  @default(0)
+  subscription   Subscription?
+  transactions   PaymentTransaction[]
   reviews     Review[]
   usage       UsageCounter[]
   users       User[]
   createdAt   DateTime       @default(now())
+}
+
+// --- Биллинг (ЮKassa): подписки и разовые пакеты (ADR-035..038) ---
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED // автопродление выключено, доступ до expiresAt
+  EXPIRED
+}
+
+// Подписка тенанта: максимум одна на компанию (companyId unique).
+// Company.plan производен: ACTIVE/CANCELLED-подписка задаёт plan, иначе FREE.
+model Subscription {
+  id              String             @id @default(cuid())
+  companyId       String             @unique
+  company         Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan            Plan // только START | BUSINESS (валидация на уровне приложения)
+  periodMonths    Int // 1 | 3 | 6 | 12
+  status          SubscriptionStatus @default(ACTIVE)
+  price           Int // копейки — цена последнего оплаченного периода
+  startedAt       DateTime           @default(now())
+  expiresAt       DateTime
+  autoRenew       Boolean            @default(true)
+  paymentMethodId String? // сохранённый payment_method ЮKassa (для автопродления)
+  cardLast4       String?
+  cardBrand       String?
+  cancelledAt     DateTime?
+  cancelReason    String?
+}
+
+enum TxnType {
+  SUBSCRIPTION
+  PACKAGE
+  REFUND
+}
+
+enum TxnStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+model PaymentTransaction {
+  id                String    @id @default(cuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type              TxnType
+  // id платежа ЮKassa; для возвратов — "refund:{refundId}"
+  providerPaymentId String?   @unique
+  amount            Int // копейки
+  status            TxnStatus @default(PENDING)
+  plan              Plan? // для type=SUBSCRIPTION
+  periodMonths      Int? // для type=SUBSCRIPTION: 1|3|6|12
+  packageSize       Int? // для type=PACKAGE: 10|50|100
+  description       String
+  createdAt         DateTime  @default(now())
+  paidAt            DateTime?
+
+  @@index([companyId, createdAt])
+  @@index([companyId, type, status])
 }
 
 enum Niche {

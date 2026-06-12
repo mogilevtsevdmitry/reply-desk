@@ -188,6 +188,68 @@ User = текст отзыва + рейтинг + источник.
 (@nestjs/throttler: 10 req/min на /auth/*, 60 req/min на остальное), pino-логгер
 (без текстов отзывов в логах — только id).
 
+## 4.1. Billing — биллинг через ЮKassa (ADR-035..038)
+
+`BillingModule` (`apps/api/src/modules/billing/`): подписки START/BUSINESS на
+1/3/6/12 мес с привязкой карты и автопродлением + разовые пакеты генераций
+(10/50/100, не сгорают) + отмена с pro-rata возвратом.
+
+**Модели (Prisma).**
+- `Subscription` — одна на компанию (`companyId` unique): `plan` (START|BUSINESS),
+  `periodMonths` (1|3|6|12), `status` (ACTIVE|CANCELLED|EXPIRED), `price` (копейки),
+  `startedAt/expiresAt`, `autoRenew`, `paymentMethodId/cardLast4/cardBrand`
+  (сохранённая карта ЮKassa), `cancelledAt/cancelReason`.
+- `PaymentTransaction` — журнал платежей: `type` (SUBSCRIPTION|PACKAGE|REFUND),
+  `providerPaymentId` (id платежа ЮKassa; для возвратов `refund:{id}`), `amount`,
+  `status` (PENDING|SUCCEEDED|FAILED|REFUNDED), `plan/periodMonths/packageSize`,
+  `paidAt`.
+- `Company.packageCredits` — остаток пакетных генераций.
+- `Company.plan` производен от подписки: активная подписка задаёт план, нет
+  подписки / истекла → FREE. Sync — при активации (webhook), отмене, в cron
+  и лениво в GET /billing.
+
+**Контракты** (`packages/contracts/src/billing.ts`): `BillingOverviewSchema`,
+`CheckoutDtoSchema` (discriminated union `kind: subscription|package`),
+`CheckoutResponseSchema`, `AutoRenewDtoSchema`, `CancelSubscriptionResponseSchema`,
+`PaymentTransactionDtoSchema`. Коды ошибок: `BILLING_DISABLED` (503),
+`NO_ACTIVE_SUBSCRIPTION` (409), `NO_BOUND_CARD` (409).
+
+**Эндпоинты** (все по companyId из JWT, кроме отмеченных):
+- `GET /billing` — план, подписка (период, expiresAt, autoRenew, карта),
+  usage месяца, packageCredits, billingEnabled, последние 20 транзакций.
+- `POST /billing/checkout` — `{kind:'subscription',plan,periodMonths}` или
+  `{kind:'package',size}` → PENDING-транзакция + платёж ЮKassa (redirect
+  confirmation, return_url `{APP_URL}/app/billing?status=ok`,
+  `save_payment_method:true` только для подписок, чек НПД: vat_code 1,
+  tax_system_code 6) → `{confirmationUrl, transactionId}`. Без ключей ЮKassa — 503.
+- `POST /billing/webhook` — ПУБЛИЧНЫЙ (@Public, ЮKassa не умеет JWT). События
+  payment.succeeded / payment.canceled / refund.succeeded; аутентичность —
+  перепроверкой через GET к API ЮKassa, идемпотентность — CAS PENDING→SUCCEEDED
+  (ADR-038). Подписка: upsert + продление от текущего expiresAt; пакет:
+  инкремент packageCredits.
+- `POST /billing/auto-renew {enabled}` — 409 без подписки/карты.
+- `POST /billing/unbind-card` — локальная отвязка (у ЮKassa нет delete) + autoRenew=false.
+- `POST /billing/cancel` — CAS ACTIVE→EXPIRED, pro-rata возврат по фактическим
+  дням с cap (ADR-036), откат при отказе ЮKassa. План → FREE.
+- `POST /billing/cron/renewals` — Bearer `CRON_SECRET`; горизонт 1 час,
+  race-защита 15 мин, Idempotence-Key `renewal:{subId}:{expiresAt}`; также
+  переводит просроченные подписки в EXPIRED.
+
+**Порядок списания генераций (ADR-037).** `UsageService.reserve()`: сначала
+месячный лимит тарифа (условный UPDATE UsageCounter), при исчерпании — атомарный
+декремент `Company.packageCredits` (updateMany `>= 1`), иначе 402 LIMIT_EXCEEDED.
+Источник (`PLAN|PACKAGE`) едет в job BullMQ; компенсация при FAILED возвращает
+в тот же источник.
+
+**ЮKassa-клиент** — собственный fetch-класс `YooKassaClient` (Basic Auth
+shop_id:secret_key, обязательный Idempotence-Key; npm-пакет не используется).
+Инжектируемый — в интеграционных тестах подменяется
+`overrideProvider(YooKassaClient)`, сеть не нужна.
+
+**env**: `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` (опциональны — без них
+checkout 503), `CRON_SECRET`, `APP_URL`, `PRICE_{START|BUSINESS}_{1|3|6|12}M`,
+`PRICE_PACK_{10|50|100}` (копейки, дефолты в .env.example).
+
 ## 5. Frontend — страницы и поведение
 
 ```

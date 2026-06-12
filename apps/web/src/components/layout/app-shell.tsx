@@ -3,10 +3,10 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { copy, usageBarAria, usageLabel, usageNum } from '@/lib/copy';
+import { copy, usageBarAria, usageLabel, usageNum, usagePackageNote } from '@/lib/copy';
 import { periodPrepositional, planLabel } from '@/lib/format';
 import { useAuth } from '@/lib/auth/auth-context';
-import { useCompanyMe } from '@/lib/hooks';
+import { useBillingOverview, useCompanyMe } from '@/lib/hooks';
 import { Button } from '../ui/button';
 import { Logo } from '../ui/logo';
 
@@ -27,9 +27,11 @@ export const NAV_REPEAT_EVENT = 'rd:nav-repeat';
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { data: company } = useCompanyMe();
+  const { data: billing } = useBillingOverview();
   const [logoutOpen, setLogoutOpen] = useState(false);
 
   const usage = company?.usage;
+  const packageCredits = billing?.packageCredits ?? 0;
   const pct = usage && usage.limit > 0 ? Math.min(100, (usage.used / usage.limit) * 100) : 0;
 
   return (
@@ -62,29 +64,36 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
         <div className="ml-auto text-right text-13 text-ink-muted min-[881px]:mt-auto min-[881px]:ml-0 min-[881px]:text-left">
           {usage ? (
-            <>
+            // Счётчик лимита — ссылка на «Тариф и оплата» (и в сайдбаре, и в мобильной панели)
+            <Link
+              href="/app/billing"
+              aria-label={copy.billingSidebarAria}
+              className="inline-block rounded-md px-2 py-1 transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent min-[881px]:-mx-2 min-[881px]:block"
+            >
               <span className="font-display text-16 text-ink min-[881px]:block min-[881px]:text-22">
                 {usageNum(usage.used, usage.limit)}
               </span>
               <span className="hidden min-[881px]:inline">
                 {company ? usageLabel(periodPrepositional(usage.period), planLabel(company.plan)) : null}
               </span>
-              <div
+              <span
                 className="mt-2 hidden h-1 overflow-hidden rounded-[2px] bg-line min-[881px]:block"
                 role="img"
                 aria-label={usageBarAria(usage.used, usage.limit)}
               >
                 <i className="block h-full rounded-[2px] bg-accent" style={{ width: `${pct}%` }} />
-              </div>
-              {usage.used >= usage.limit ? (
-                <Link
-                  href="/app/upgrade"
-                  className="mt-2 hidden text-13 text-accent hover:underline min-[881px]:block"
-                >
-                  {copy.limitCtaLink}
-                </Link>
+              </span>
+              {packageCredits > 0 ? (
+                <span className="mt-1 block text-13 text-accent">
+                  {usagePackageNote(packageCredits)}
+                </span>
               ) : null}
-            </>
+              {usage.used >= usage.limit ? (
+                <span className="mt-2 hidden text-13 text-accent min-[881px]:block">
+                  {copy.limitCtaLink}
+                </span>
+              ) : null}
+            </Link>
           ) : null}
           <button
             type="button"

@@ -26,6 +26,7 @@ const SAMPLE_MAX = 1000;
 /** Блок «Документы»: ссылки на публичные юридические страницы /legal/[slug]. */
 const LEGAL_DOCS: ReadonlyArray<{ slug: string; title: string }> = [
   { slug: 'terms-of-service', title: copy.legalTosTitle },
+  { slug: 'recurring-payments', title: copy.legalRecurringTitle },
   { slug: 'privacy-policy', title: copy.legalPrivacyTitle },
   { slug: 'consent-pd', title: copy.legalConsentPdTitle },
   { slug: 'consent-llm', title: copy.legalConsentLlmTitle },

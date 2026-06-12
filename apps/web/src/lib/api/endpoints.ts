@@ -1,5 +1,8 @@
 import {
   AuthTokenResponseSchema,
+  BillingOverviewSchema,
+  CancelSubscriptionResponseSchema,
+  CheckoutResponseSchema,
   CompanyDtoSchema,
   CompanyMeResponseSchema,
   CreateCompanyResponseSchema,
@@ -9,6 +12,10 @@ import {
   RetryReviewResponseSchema,
   ReviewWithGenerationSchema,
   type AuthTokenResponse,
+  type BillingOverview,
+  type CancelSubscriptionResponse,
+  type CheckoutDto,
+  type CheckoutResponse,
   type CompanyDto,
   type CompanyMeResponse,
   type CreateCompanyDto,
@@ -47,6 +54,26 @@ export const createCompany = (dto: CreateCompanyDto): Promise<CreateCompanyRespo
 
 export const updateCompany = (dto: UpdateCompanyDto): Promise<CompanyDto> =>
   apiJson('/company/me', CompanyDtoSchema, { method: 'PATCH', body: dto });
+
+// ---------- Billing ----------
+
+export const getBilling = (): Promise<BillingOverview> =>
+  apiJson('/billing', BillingOverviewSchema);
+
+/** Покупка подписки или пакета → URL страницы оплаты ЮKassa (redirect). */
+export const billingCheckout = (dto: CheckoutDto): Promise<CheckoutResponse> =>
+  apiJson('/billing/checkout', CheckoutResponseSchema, { method: 'POST', body: dto });
+
+export const setAutoRenew = async (enabled: boolean): Promise<void> => {
+  await apiRequest('/billing/auto-renew', { method: 'POST', body: { enabled } });
+};
+
+export const unbindCard = async (): Promise<void> => {
+  await apiRequest('/billing/unbind-card', { method: 'POST' });
+};
+
+export const cancelSubscription = (): Promise<CancelSubscriptionResponse> =>
+  apiJson('/billing/cancel', CancelSubscriptionResponseSchema, { method: 'POST' });
 
 // ---------- Reviews ----------
 

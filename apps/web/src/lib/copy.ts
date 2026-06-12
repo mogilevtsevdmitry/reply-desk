@@ -158,7 +158,6 @@ export const copy = {
   planBusinessName: 'BUSINESS',
   planBusinessDesc:
     '1000 генераций в месяц — для нескольких точек или большого потока отзывов',
-  limitCta: 'Сообщить мне, когда тарифы откроются',
   limitBack: 'Вернуться к истории',
   limitCtaLink: 'Открыть тарифы',
 
@@ -207,6 +206,7 @@ export const copy = {
   settingsPlanTitle: 'Тариф',
   settingsDocsTitle: 'Документы',
   legalTosTitle: 'Пользовательское соглашение',
+  legalRecurringTitle: 'Условия рекуррентных платежей',
   legalPrivacyTitle: 'Политика обработки персональных данных',
   legalConsentPdTitle: 'Согласие на обработку персональных данных',
   legalConsentLlmTitle: 'Согласие на передачу данных в LLM Anthropic (США)',
@@ -214,6 +214,68 @@ export const copy = {
   settingsSave: 'Сохранить настройки',
   settingsSaveNote: 'Прошлые генерации не изменятся',
   toastSettingsSaved: 'Настройки сохранены — применятся к новым генерациям',
+
+  // ---------- 9. Тариф и оплата (/app/billing) ----------
+  billingTitle: 'Тариф и оплата',
+  billingSub: 'Подписка, пакеты генераций и история платежей',
+  billingSidebarAria: 'Счётчик генераций — открыть тариф и оплату',
+  billingDisabledNote:
+    'Приём платежей временно недоступен — оплата откроется позже. Тарифы можно изучить уже сейчас.',
+
+  billingCurrentTitle: 'Текущий тариф',
+  billingNoSubscription: 'Подписка не оформлена — действует бесплатный тариф',
+  billingAutoRenewLabel: 'Автопродление',
+  billingAutoRenewOnNote: 'Включено — продлим подписку и спишем оплату в день окончания периода',
+  billingAutoRenewOffNote: 'Выключено — подписка завершится в конце оплаченного периода',
+  billingCardLabel: 'Карта для автопродления',
+  billingCardNone: 'Карта не привязана',
+  billingCardUnbind: 'Отвязать карту',
+  billingUsageLeftLabel: 'Использовано в этом месяце',
+  billingStatusCancelled: 'Подписка отменена',
+  billingStatusExpired: 'Срок подписки истёк',
+  toastAutoRenewOn: 'Автопродление включено',
+  toastAutoRenewOff: 'Автопродление выключено',
+  toastCardUnbound: 'Карта отвязана — автопродление выключено',
+
+  billingPlansTitle: 'Подписки',
+  billingPeriodLabel: 'Период оплаты',
+  billingPlanCurrentBadge: 'Ваш тариф',
+  billingSubscribe: 'Оформить',
+  billingChangePlan: 'Сменить тариф',
+  billingLegalPrefix: 'Нажимая «Оплатить», вы принимаете',
+  billingLegalRecurring: 'условия рекуррентных платежей',
+  billingLegalAnd: 'и',
+  billingLegalOffer: 'оферту',
+
+  billingPacksTitle: 'Пакеты по запросу',
+  billingPacksNote:
+    'Пакетные генерации не сгорают и тратятся после месячного лимита тарифа',
+  billingPackBuy: 'Купить',
+
+  billingHistoryTitle: 'История платежей',
+  billingHistoryEmpty: 'Платежей пока не было',
+  billingHistoryColDate: 'Дата',
+  billingHistoryColDesc: 'Описание',
+  billingHistoryColAmount: 'Сумма',
+  billingHistoryColStatus: 'Статус',
+
+  billingCancelTitle: 'Отмена подписки',
+  billingCancelText:
+    'Доступ к тарифу прекратится сразу после отмены. Деньги за неиспользованные дни вернём пропорционально — по ст. 32 Закона о защите прав потребителей.',
+  billingCancelButton: 'Отменить подписку',
+  billingCancelDialogTitle: 'Отменить подписку?',
+  billingCancelDialogText:
+    'Доступ к тарифу прекратится сразу, лимит вернётся к бесплатному. Деньги за неиспользованные дни вернём пропорционально на карту — точную сумму покажем после отмены.',
+  billingCancelConfirm: 'Да, отменить',
+  billingCancelKeep: 'Оставить подписку',
+  toastCancelledNoRefund: 'Подписка отменена',
+
+  billingProcessing: 'Платёж обрабатывается — обычно это занимает несколько секунд…',
+  billingProcessingDone: 'Оплата прошла — тариф обновлён',
+  billingProcessingTimeout:
+    'Платёж ещё обрабатывается. Обновите страницу через минуту — данные подтянутся.',
+  billingRefresh: 'Обновить',
+  billingLoadError: 'Не удалось загрузить данные тарифа',
 
   // ---------- 8. Системное ----------
   toastCopied: 'Скопировано в буфер обмена',
@@ -301,10 +363,6 @@ export const limitTitle = (monthAccusative: string): string =>
 export const limitText = (limit: number, plan: string, date: string): string =>
   `Вы использовали все ${limit} генераций тарифа ${plan}. Счётчик обнулится ${date} — отзыв можно будет обработать тогда.`;
 
-/** limit-cta-toast: «Записали — напишем на {email}, когда тарифы станут доступны». */
-export const limitCtaToast = (email: string): string =>
-  `Записали — напишем на ${email}, когда тарифы станут доступны`;
-
 /** settings-plan-note. */
 export const settingsPlanNote = (plan: string, date: string): string =>
   `Тариф ${plan}. Счётчик обнулится ${date}. Платные тарифы появятся позже — мы напишем вам на почту.`;
@@ -315,3 +373,45 @@ export const legalEdition = (version: string, updated: string): string =>
 
 /** result-meta: «{source} · {date}». */
 export const resultMeta = (source: string, date: string): string => `${source} · ${date}`;
+
+// ---------- 9. Тариф и оплата ----------
+
+/** usage-package-note: «+{n} из пакета» (сайдбар и блок текущего тарифа). */
+export const usagePackageNote = (n: number): string => `+${n} из пакета`;
+
+/** billing-valid-until: «действует до {date}» ({date} — «11 июля 2026»). */
+export const billingValidUntil = (date: string): string => `действует до ${date}`;
+
+/** billing-period-option: «1 месяц / 3 месяца / 12 месяцев». */
+export function billingPeriodOption(months: number): string {
+  return plural(months, {
+    one: `${months} месяц`,
+    few: `${months} месяца`,
+    many: `${months} месяцев`,
+  });
+}
+
+/** billing-plan-limit: «{n} генераций в месяц». */
+export const billingPlanLimit = (n: number): string => `${n} генераций в месяц`;
+
+/** billing-per-month: «{price} в месяц» ({price} уже отформатирован в рубли). */
+export const billingPerMonth = (price: string): string => `${price} в месяц`;
+
+/** billing-discount: «выгода {pct}%» против помесячной оплаты. */
+export const billingDiscount = (pct: number): string => `выгода ${pct}%`;
+
+/** billing-pack-name: «{n} генераций». */
+export const billingPackName = (n: number): string =>
+  plural(n, { one: `${n} генерация`, few: `${n} генерации`, many: `${n} генераций` });
+
+/** toast-cancelled-refund: «Подписка отменена — вернём {amount} на карту». */
+export const toastCancelledRefund = (amount: string): string =>
+  `Подписка отменена — вернём ${amount} на карту`;
+
+/** Статусы транзакций истории платежей. */
+export const txnStatusLabels: Record<string, string> = {
+  PENDING: 'Ожидает оплаты',
+  SUCCEEDED: 'Оплачен',
+  FAILED: 'Не прошёл',
+  REFUNDED: 'Возвращён',
+};

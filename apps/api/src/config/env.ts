@@ -45,6 +45,38 @@ export const EnvSchema = z.object({
   // Путь к папке промптов; по умолчанию prompts/ ищется вверх от cwd/__dirname
   PROMPTS_DIR: z.string().optional(),
 
+  // --- Биллинг (ЮKassa, ADR-035..038). Суммы — в копейках. ---
+  // Без YOOKASSA_SHOP_ID/SECRET_KEY биллинг выключен: /billing/checkout отдаёт 503
+  // BILLING_DISABLED, остальные эндпоинты /billing работают.
+  YOOKASSA_SHOP_ID: z
+    .string()
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
+  YOOKASSA_SECRET_KEY: z
+    .string()
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
+  // Bearer-секрет для POST /billing/cron/renewals (автопродление по крону)
+  CRON_SECRET: z
+    .string()
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
+  // Базовый URL фронтенда — для return_url после оплаты ЮKassa
+  APP_URL: z.string().default('http://localhost:3001'),
+  // Цены подписок (копейки): START 100 ген/мес, BUSINESS 1000 ген/мес
+  PRICE_START_1M: z.coerce.number().int().positive().default(79_000),
+  PRICE_START_3M: z.coerce.number().int().positive().default(219_000),
+  PRICE_START_6M: z.coerce.number().int().positive().default(399_000),
+  PRICE_START_12M: z.coerce.number().int().positive().default(699_000),
+  PRICE_BUSINESS_1M: z.coerce.number().int().positive().default(599_000),
+  PRICE_BUSINESS_3M: z.coerce.number().int().positive().default(1_649_000),
+  PRICE_BUSINESS_6M: z.coerce.number().int().positive().default(2_999_000),
+  PRICE_BUSINESS_12M: z.coerce.number().int().positive().default(5_399_000),
+  // Цены разовых пакетов генераций (копейки); пакетные генерации не сгорают
+  PRICE_PACK_10: z.coerce.number().int().positive().default(10_000),
+  PRICE_PACK_50: z.coerce.number().int().positive().default(50_000),
+  PRICE_PACK_100: z.coerce.number().int().positive().default(100_000),
+
   // --- Rate limiting (@nestjs/throttler) ---
   // Глобальный лимит (req/ttl): дефолт 60 req/60s
   THROTTLE_DEFAULT_LIMIT: z.coerce.number().int().positive().default(60),

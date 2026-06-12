@@ -2,6 +2,7 @@ import { Injectable, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ConnectionOptions, Queue } from 'bullmq';
 import type { Env } from '../../config/env';
+import type { UsageSource } from '../usage/usage.service';
 
 export const GENERATION_QUEUE_NAME = 'generation';
 export const GENERATION_JOB_NAME = 'generate';
@@ -11,12 +12,18 @@ export function bullConnection(redisUrl: string): ConnectionOptions {
   return { url: redisUrl, maxRetriesPerRequest: null };
 }
 
-/** Данные job. period фиксируется при резервировании — компенсация при FAILED бьёт в тот же период. */
+/**
+ * Данные job. period и usageSource фиксируются при резервировании —
+ * компенсация при FAILED бьёт в тот же период и тот же источник (ADR-037).
+ */
 export interface GenerationJobData {
   generationId: string;
   reviewId: string;
   companyId: string;
   period: string;
+  /** Откуда списана генерация: PLAN (лимит тарифа) | PACKAGE (пакетные кредиты).
+   *  Optional — для job, поставленных в очередь до введения биллинга (дефолт PLAN). */
+  usageSource?: UsageSource;
 }
 
 /** Producer очереди `generation`. Отдельное Redis-соединение (требование BullMQ). */

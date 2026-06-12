@@ -18,6 +18,7 @@ export interface LegalDoc {
 export const LEGAL_SLUGS = [
   'privacy-policy',
   'terms-of-service',
+  'recurring-payments',
   'consent-pd',
   'consent-llm',
 ] as const;

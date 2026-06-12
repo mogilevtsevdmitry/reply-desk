@@ -4,3 +4,4 @@ export * from './auth';
 export * from './company';
 export * from './generation';
 export * from './reviews';
+export * from './billing';

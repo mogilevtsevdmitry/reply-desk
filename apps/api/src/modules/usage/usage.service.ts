@@ -6,10 +6,19 @@ import type { Env } from '../../config/env';
 import { PrismaService } from '../../prisma/prisma.service';
 
 /**
- * Лимиты генераций по модели «резервирование» (ADR-002):
- * - reserve() — атомарный инкремент UsageCounter внутри транзакции вызывающего
- *   (POST /reviews, POST /reviews/:id/retry): конкурентные запросы не пробивают лимит;
- * - compensate() — атомарный декремент (не ниже 0), вызывается воркером при FAILED.
+ * Источник, из которого списана генерация (ADR-037):
+ * PLAN — месячный лимит тарифа (UsageCounter), PACKAGE — пакетные кредиты
+ * (Company.packageCredits). Хранится в job BullMQ — компенсация при FAILED
+ * возвращает генерацию туда, откуда списали.
+ */
+export type UsageSource = 'PLAN' | 'PACKAGE';
+
+/**
+ * Лимиты генераций по модели «резервирование» (ADR-002, порядок списания — ADR-037):
+ * - reserve() — атомарное списание внутри транзакции вызывающего
+ *   (POST /reviews, POST /reviews/:id/retry): сначала месячный лимит тарифа,
+ *   при исчерпании — пакетные кредиты; конкурентные запросы не пробивают ни то, ни другое;
+ * - compensate() — атомарный возврат в исходный источник, вызывается воркером при FAILED.
  */
 @Injectable()
 export class UsageService {
@@ -39,17 +48,20 @@ export class UsageService {
 
   /**
    * Резервирует одну генерацию. Вызывать ВНУТРИ транзакции вместе с созданием
-   * Review + Generation. Бросает AppException(402 LIMIT_EXCEEDED), если лимит исчерпан.
+   * Review + Generation. Порядок списания (ADR-037): сначала месячный лимит
+   * тарифа (UsageCounter), при исчерпании — атомарный декремент пакетных
+   * кредитов (Company.packageCredits >= 1); если и там пусто —
+   * AppException(402 LIMIT_EXCEEDED). Возвращает источник списания.
    *
-   * Атомарность: условный UPDATE ... WHERE used < limit — БД сериализует
-   * конкурентные инкременты на блокировке строки; «победит» ровно остаток лимита.
+   * Атомарность: условный UPDATE ... WHERE used < limit / packageCredits >= 1 —
+   * БД сериализует конкурентные декременты на блокировке строки.
    */
   async reserve(
     tx: Prisma.TransactionClient,
     companyId: string,
     plan: Plan,
     period: string = this.currentPeriod(),
-  ): Promise<void> {
+  ): Promise<UsageSource> {
     const limit = this.limitFor(plan);
 
     // Гарантируем существование строки счётчика периода (идемпотентно).
@@ -71,23 +83,41 @@ export class UsageService {
       WHERE "companyId" = ${companyId} AND "period" = ${period} AND "used" < ${limit}
     `;
 
-    if (updated === 0) {
-      throw new AppException('LIMIT_EXCEEDED', 'Лимит генераций на этот месяц исчерпан', 402, {
-        limit,
-        period,
-      });
-    }
+    if (updated > 0) return 'PLAN';
+
+    // Месячный лимит исчерпан — пробуем пакетные кредиты (атомарно: только
+    // строки с packageCredits >= 1, конкуренция не уводит остаток в минус).
+    const fromPackage = await tx.company.updateMany({
+      where: { id: companyId, packageCredits: { gte: 1 } },
+      data: { packageCredits: { decrement: 1 } },
+    });
+    if (fromPackage.count > 0) return 'PACKAGE';
+
+    throw new AppException('LIMIT_EXCEEDED', 'Лимит генераций на этот месяц исчерпан', 402, {
+      limit,
+      period,
+    });
   }
 
   /**
-   * Компенсация резерва при FAILED-генерации: атомарный декремент, не ниже 0.
-   * Вызывается воркером генерации (задача 2.2) вне транзакции резервирования.
+   * Компенсация резерва при FAILED-генерации: атомарный возврат в исходный
+   * источник (ADR-037) — PLAN: декремент UsageCounter (не ниже 0),
+   * PACKAGE: инкремент Company.packageCredits.
+   * Вызывается воркером генерации вне транзакции резервирования.
    */
   async compensate(
     companyId: string,
     period: string,
+    source: UsageSource = 'PLAN',
     tx: Prisma.TransactionClient = this.prisma,
   ): Promise<void> {
+    if (source === 'PACKAGE') {
+      await tx.company.updateMany({
+        where: { id: companyId },
+        data: { packageCredits: { increment: 1 } },
+      });
+      return;
+    }
     await tx.$executeRaw`
       UPDATE "UsageCounter"
       SET "used" = "used" - 1

@@ -78,6 +78,24 @@ export function periodResetDate(period: string): string {
   return `1 ${MONTHS_GENITIVE[next - 1]}`;
 }
 
+/** «11 июня 2026» — для дат биллинга, где важен год. */
+export function formatDayYear(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getDate()} ${MONTHS_GENITIVE[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+const rubFormat = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
+const rubFormatFrac = new Intl.NumberFormat('ru-RU', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/** Копейки → «790 ₽» / «1 649 ₽» (дробная часть — только если она есть). */
+export function formatKopecks(kopecks: number): string {
+  const rub = kopecks / 100;
+  return `${Number.isInteger(rub) ? rubFormat.format(rub) : rubFormatFrac.format(rub)} ₽`;
+}
+
 /** Plan enum → подпись тарифа: FREE → «Free». */
 export function planLabel(plan: string): string {
   return plan.charAt(0) + plan.slice(1).toLowerCase();

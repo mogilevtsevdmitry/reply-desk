@@ -20,6 +20,7 @@ const company: Company = {
   niche: 'SALON',
   plan: 'FREE',
   toneOfVoice: { tone: 'soft', examples: [] },
+  packageCredits: 0,
   createdAt: new Date('2026-06-11T00:00:00Z'),
 };
 

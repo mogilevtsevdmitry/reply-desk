@@ -34,7 +34,7 @@ function setup(): MockSetup {
     $transaction: jest.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
   } as unknown as PrismaService;
   const usage = {
-    reserve: jest.fn(async () => undefined),
+    reserve: jest.fn(async () => 'PLAN'),
     compensate: jest.fn(async () => undefined),
     currentPeriod: jest.fn(() => PERIOD),
   };
@@ -87,7 +87,22 @@ describe('ReviewsService.create — POST /reviews', () => {
       reviewId: 'review-1',
       companyId: COMPANY_ID,
       period: PERIOD,
+      usageSource: 'PLAN',
     });
+  });
+
+  it('списание из пакета → usageSource=PACKAGE уходит в job (ADR-037)', async () => {
+    const { service, tx, usage, queue } = setup();
+    tx.company.findUnique.mockResolvedValue({ id: COMPANY_ID, plan: 'FREE' });
+    tx.review.create.mockResolvedValue({ id: 'review-1' });
+    tx.generation.create.mockResolvedValue({ id: 'gen-1' });
+    usage.reserve.mockResolvedValue('PACKAGE');
+
+    await service.create(COMPANY_ID, { source: 'OTHER', rawText: 'Текст' });
+
+    expect(queue.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ usageSource: 'PACKAGE' }),
+    );
   });
 
   it('authorName не передан → в Review сохраняется null', async () => {
@@ -134,6 +149,7 @@ describe('ReviewsService.retry — POST /reviews/:id/retry (ADR-003)', () => {
       reviewId: 'review-1',
       companyId: COMPANY_ID,
       period: PERIOD,
+      usageSource: 'PLAN',
     });
   });
 

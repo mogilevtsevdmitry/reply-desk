@@ -135,13 +135,23 @@ describe('GenerationPipelineService — пайплайн воркера', () => 
       where: { id: 'gen-1' },
       data: { status: 'FAILED', error: expect.stringContaining('некорректный результат') },
     });
-    expect(usage.compensate).toHaveBeenCalledWith('company-1', '2026-06');
+    expect(usage.compensate).toHaveBeenCalledWith('company-1', '2026-06', 'PLAN');
 
     // Текст отзыва не попадает в сохранённую ошибку.
     const failedCall = prisma.generation.update.mock.calls.find(
       (c) => (c[0] as { data: { status?: string } }).data.status === 'FAILED',
     );
     expect((failedCall![0] as { data: { error: string } }).data.error).not.toContain('Текст отзыва');
+  });
+
+  it('FAILED при списании из пакета → компенсация в источник PACKAGE (ADR-037)', async () => {
+    const { service, usage } = setup(async () => {
+      throw new LlmInvalidOutputError('невалидный вывод');
+    });
+
+    await service.process({ ...JOB, usageSource: 'PACKAGE' });
+
+    expect(usage.compensate).toHaveBeenCalledWith('company-1', '2026-06', 'PACKAGE');
   });
 
   it('несуществующая генерация → job тихо пропускается без падения', async () => {

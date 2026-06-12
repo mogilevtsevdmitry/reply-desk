@@ -8,6 +8,7 @@ import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { JwtAuthGuard } from './common/jwt-auth.guard';
 import { Env, validateEnv } from './config/env';
 import { AuthModule } from './modules/auth/auth.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { CompanyModule } from './modules/company/company.module';
 import { GenerationModule } from './modules/generation/generation.module';
 import { HealthModule } from './modules/health/health.module';
@@ -62,6 +63,7 @@ import { RedisModule } from './redis/redis.module';
     AuthModule,
     CompanyModule,
     UsageModule,
+    BillingModule,
     ReviewsModule,
     GenerationModule,
     HealthModule,

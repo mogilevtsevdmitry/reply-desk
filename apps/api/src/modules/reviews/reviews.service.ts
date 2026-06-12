@@ -44,7 +44,7 @@ export class ReviewsService {
       if (!company) {
         throw new AppException('COMPANY_NOT_FOUND', 'Компания не найдена', 404);
       }
-      await this.usage.reserve(tx, companyId, company.plan, period);
+      const usageSource = await this.usage.reserve(tx, companyId, company.plan, period);
       const review = await tx.review.create({
         data: {
           companyId,
@@ -55,7 +55,7 @@ export class ReviewsService {
         },
       });
       const generation = await tx.generation.create({ data: { reviewId: review.id } });
-      return { reviewId: review.id, generationId: generation.id };
+      return { reviewId: review.id, generationId: generation.id, usageSource };
     });
 
     await this.queue.enqueue({
@@ -63,8 +63,9 @@ export class ReviewsService {
       reviewId: result.reviewId,
       companyId,
       period,
+      usageSource: result.usageSource,
     });
-    return result;
+    return { reviewId: result.reviewId, generationId: result.generationId };
   }
 
   /**
@@ -89,12 +90,12 @@ export class ReviewsService {
           409,
         );
       }
-      await this.usage.reserve(tx, companyId, review.company.plan, period);
+      const usageSource = await this.usage.reserve(tx, companyId, review.company.plan, period);
       await tx.generation.update({
         where: { id: review.generation.id },
         data: { status: 'PENDING', error: null },
       });
-      return { generationId: review.generation.id };
+      return { generationId: review.generation.id, usageSource };
     });
 
     await this.queue.enqueue({
@@ -102,8 +103,9 @@ export class ReviewsService {
       reviewId,
       companyId,
       period,
+      usageSource: result.usageSource,
     });
-    return result;
+    return { generationId: result.generationId };
   }
 
   /** GET /reviews: фильтры source/category/severity/from/to + пагинация page/pageSize. */

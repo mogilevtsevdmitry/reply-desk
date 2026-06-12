@@ -13,6 +13,9 @@ export const ErrorCodeSchema = z.enum([
   'CONFLICT',
   'LIMIT_EXCEEDED',
   'RATE_LIMITED',
+  'BILLING_DISABLED',
+  'NO_ACTIVE_SUBSCRIPTION',
+  'NO_BOUND_CARD',
   'INTERNAL',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;

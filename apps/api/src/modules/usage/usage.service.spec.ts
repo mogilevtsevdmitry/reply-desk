@@ -22,11 +22,33 @@ function makeConfig(): ConfigService<Env, true> {
 interface FakeCounterStore {
   used: number;
   exists: boolean;
+  /** Остаток пакетных кредитов компании (ADR-037). */
+  packageCredits?: number;
 }
 
 /** Эмуляция Prisma TransactionClient поверх in-memory счётчика. */
 function makeTx(store: FakeCounterStore): Prisma.TransactionClient {
   return {
+    company: {
+      // Атомарный декремент/инкремент packageCredits (порядок списания, ADR-037)
+      updateMany: jest.fn(
+        async (args: {
+          where: { packageCredits?: { gte: number } };
+          data: { packageCredits: { decrement?: number; increment?: number } };
+        }) => {
+          const credits = store.packageCredits ?? 0;
+          if (args.data.packageCredits.decrement) {
+            if (credits >= (args.where.packageCredits?.gte ?? 1)) {
+              store.packageCredits = credits - args.data.packageCredits.decrement;
+              return { count: 1 };
+            }
+            return { count: 0 };
+          }
+          store.packageCredits = credits + (args.data.packageCredits.increment ?? 0);
+          return { count: 1 };
+        },
+      ),
+    },
     usageCounter: {
       upsert: jest.fn(async () => {
         store.exists = true;
@@ -64,16 +86,16 @@ describe('UsageService — резервирование лимита (ADR-002)',
     service = new UsageService({} as unknown as PrismaService, makeConfig());
   });
 
-  it('резервирует генерацию, пока лимит не исчерпан', async () => {
+  it('резервирует генерацию из лимита тарифа, пока он не исчерпан (source=PLAN)', async () => {
     const store: FakeCounterStore = { used: 0, exists: false };
     const tx = makeTx(store);
 
-    await expect(service.reserve(tx, 'c1', 'FREE', '2026-06')).resolves.toBeUndefined();
+    await expect(service.reserve(tx, 'c1', 'FREE', '2026-06')).resolves.toBe('PLAN');
     expect(store.used).toBe(1);
   });
 
-  it('бросает 402 LIMIT_EXCEEDED при исчерпанном лимите', async () => {
-    const store: FakeCounterStore = { used: 10, exists: true };
+  it('бросает 402 LIMIT_EXCEEDED при исчерпанном лимите и пустом пакете', async () => {
+    const store: FakeCounterStore = { used: 10, exists: true, packageCredits: 0 };
     const tx = makeTx(store);
 
     try {
@@ -108,15 +130,65 @@ describe('UsageService — резервирование лимита (ADR-002)',
     }
   });
 
-  it('compensate уменьшает счётчик, но не ниже нуля', async () => {
+  it('compensate(PLAN) уменьшает счётчик, но не ниже нуля', async () => {
     const store: FakeCounterStore = { used: 1, exists: true };
     const tx = makeTx(store);
 
-    await service.compensate('c1', '2026-06', tx);
+    await service.compensate('c1', '2026-06', 'PLAN', tx);
     expect(store.used).toBe(0);
 
-    await service.compensate('c1', '2026-06', tx);
+    await service.compensate('c1', '2026-06', 'PLAN', tx);
     expect(store.used).toBe(0); // не уходит в минус
+  });
+
+  describe('порядок списания: лимит тарифа → пакет → 402 (ADR-037)', () => {
+    it('при исчерпанном лимите списывает из пакета (source=PACKAGE)', async () => {
+      const store: FakeCounterStore = { used: 10, exists: true, packageCredits: 3 };
+      const tx = makeTx(store);
+
+      await expect(service.reserve(tx, 'c1', 'FREE', '2026-06')).resolves.toBe('PACKAGE');
+      expect(store.used).toBe(10); // лимит не тронут
+      expect(store.packageCredits).toBe(2);
+    });
+
+    it('пока лимит не исчерпан — пакет не трогается', async () => {
+      const store: FakeCounterStore = { used: 9, exists: true, packageCredits: 5 };
+      const tx = makeTx(store);
+
+      await expect(service.reserve(tx, 'c1', 'FREE', '2026-06')).resolves.toBe('PLAN');
+      expect(store.packageCredits).toBe(5);
+    });
+
+    it('исчерпаны и лимит, и пакет → 402, остатки не уходят в минус', async () => {
+      const store: FakeCounterStore = { used: 10, exists: true, packageCredits: 0 };
+      const tx = makeTx(store);
+
+      await expect(service.reserve(tx, 'c1', 'FREE', '2026-06')).rejects.toMatchObject({
+        code: 'LIMIT_EXCEEDED',
+      });
+      expect(store.used).toBe(10);
+      expect(store.packageCredits).toBe(0);
+    });
+
+    it('конкурентность на последнем пакетном кредите: ровно один успех', async () => {
+      const store: FakeCounterStore = { used: 10, exists: true, packageCredits: 1 };
+      const tx = makeTx(store);
+
+      const results = await Promise.allSettled(
+        Array.from({ length: 5 }, () => service.reserve(tx, 'c1', 'FREE', '2026-06')),
+      );
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect(store.packageCredits).toBe(0);
+    });
+
+    it('compensate(PACKAGE) возвращает кредит в пакет, а не в счётчик', async () => {
+      const store: FakeCounterStore = { used: 10, exists: true, packageCredits: 0 };
+      const tx = makeTx(store);
+
+      await service.compensate('c1', '2026-06', 'PACKAGE', tx);
+      expect(store.packageCredits).toBe(1);
+      expect(store.used).toBe(10); // счётчик лимита не тронут
+    });
   });
 
   it('лимиты тарифов берутся из env: FREE=10, START=100, BUSINESS=1000', () => {

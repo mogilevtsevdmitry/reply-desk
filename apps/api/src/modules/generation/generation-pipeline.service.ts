@@ -145,8 +145,9 @@ export class GenerationPipelineService {
         where: { id: generation.id },
         data: { status: 'FAILED', error: message },
       });
-      // Компенсация резерва лимита (ADR-002) — в период резервирования из job.
-      await this.usage.compensate(job.companyId, job.period);
+      // Компенсация резерва (ADR-002, ADR-037) — в период и источник из job
+      // (PLAN — счётчик лимита, PACKAGE — пакетные кредиты).
+      await this.usage.compensate(job.companyId, job.period, job.usageSource ?? 'PLAN');
       await this.publish(generation.id, { status: 'FAILED', error: message });
     }
   }

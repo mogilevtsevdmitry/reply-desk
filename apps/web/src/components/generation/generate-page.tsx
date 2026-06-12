@@ -296,7 +296,7 @@ export function GeneratePage() {
             ) : (
               <span className="text-13 text-ink-faint">
                 {copy.genLimitNoteZero}{' '}
-                <Link href="/app/upgrade" className="text-accent hover:underline">
+                <Link href="/app/billing" className="text-accent hover:underline">
                   {copy.limitCtaLink}
                 </Link>
               </span>
