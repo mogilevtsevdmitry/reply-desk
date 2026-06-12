@@ -70,6 +70,7 @@ const POLL_INTERVAL_MS = 2500;
  */
 export function BillingPage() {
   const { data, isPending, isError, refetch } = useBillingOverview();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [processing, setProcessing] = useState<ProcessingState>('idle');
@@ -92,6 +93,8 @@ export function BillingPage() {
         const res = await refetch();
         const last = res.data?.transactions[0];
         if (last && last.status !== 'PENDING') {
+          // Тариф/лимит в сайдбаре питаются company/me — обновить и его
+          void queryClient.invalidateQueries({ queryKey: COMPANY_ME_KEY });
           if (!cancelled) setProcessing('done');
           return;
         }
@@ -101,7 +104,7 @@ export function BillingPage() {
     return () => {
       cancelled = true;
     };
-  }, [processing, refetch]);
+  }, [processing, refetch, queryClient]);
 
   if (isPending) return <BillingSkeleton />;
 
