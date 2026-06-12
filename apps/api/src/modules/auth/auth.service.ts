@@ -2,14 +2,26 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import type { User } from '@prisma/client';
-import type { AccessTokenPayload, LoginDto, RegisterDto, UserDto } from '@replydesk/contracts';
+import type {
+  AccessTokenPayload,
+  ForgotPasswordDto,
+  LoginDto,
+  RegisterDto,
+  ResetPasswordDto,
+  UserDto,
+} from '@replydesk/contracts';
 import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'node:crypto';
 import { AppException } from '../../common/app.exception';
 import type { Env } from '../../config/env';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
+import { passwordResetEmail, welcomeEmail } from '../mail/mail.templates';
 
 export const BCRYPT_COST = 12;
+
+/** TTL токена сброса пароля — 1 час (ADR-043). */
+export const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
 
 /**
  * Версия редакции юридических документов, которую принимает пользователь
@@ -26,6 +38,9 @@ export interface IssuedTokens {
 
 const INVALID_CREDENTIALS_MESSAGE = 'Неверный email или пароль';
 
+/** Одно сообщение на все случаи невалидного токена сброса — не раскрываем причину (ADR-043). */
+const INVALID_RESET_TOKEN_MESSAGE = 'Ссылка устарела или уже использована';
+
 @Injectable()
 export class AuthService {
   /**
@@ -38,6 +53,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService<Env, true>,
+    private readonly mailService: MailService,
   ) {}
 
   async register(dto: RegisterDto): Promise<UserDto> {
@@ -58,7 +74,71 @@ export class AuthService {
         consentDocsVersion: CONSENT_DOCS_VERSION,
       },
     });
+    // Приветственное письмо — fire-and-forget: ошибка почты не валит регистрацию (ADR-044).
+    void this.mailService.send(welcomeEmail(user.email, this.appUrl()));
     return this.toUserDto(user);
+  }
+
+  /**
+   * Запрос восстановления пароля (ADR-043). Всегда «успех»: существование
+   * аккаунта не раскрывается ни ответом, ни таймингом (фиктивный bcrypt-compare
+   * при отсутствии пользователя — как в login).
+   */
+  async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    if (!user) {
+      // Фиктивная работа (как dummy-compare в login): время ответа не выдаёт отсутствие аккаунта.
+      await bcrypt.compare(randomBytes(8).toString('hex'), this.dummyHash);
+      return;
+    }
+
+    // Прежние неиспользованные токены инвалидируются: действует только последняя ссылка.
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+    await this.prisma.$transaction([
+      this.prisma.passwordResetToken.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.passwordResetToken.create({
+        data: { userId: user.id, tokenHash: this.hashToken(token), expiresAt },
+      }),
+    ]);
+
+    const resetUrl = `${this.appUrl()}/reset-password?token=${token}`;
+    void this.mailService.send(passwordResetEmail(user.email, resetUrl));
+  }
+
+  /**
+   * Сброс пароля по токену из письма (ADR-043). Любая проблема с токеном
+   * (нет / использован / истёк) → 422 INVALID_TOKEN с единым сообщением.
+   * Успех: новый bcrypt-хэш, токен одноразово гасится, ВСЕ refresh-токены
+   * пользователя ревокуются — активные сессии разлогиниваются.
+   */
+  async resetPassword(dto: ResetPasswordDto): Promise<void> {
+    const stored = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash: this.hashToken(dto.token) },
+    });
+    if (!stored || stored.usedAt || stored.expiresAt <= new Date()) {
+      throw new AppException('INVALID_TOKEN', INVALID_RESET_TOKEN_MESSAGE, 422);
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST);
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: stored.userId },
+        data: { passwordHash },
+      }),
+      this.prisma.passwordResetToken.update({
+        where: { id: stored.id },
+        data: { usedAt: now },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId: stored.userId, revokedAt: null },
+        data: { revokedAt: now },
+      }),
+    ]);
   }
 
   async login(dto: LoginDto): Promise<IssuedTokens> {
@@ -144,6 +224,10 @@ export class AuthService {
       refreshToken,
       refreshExpiresAt,
     };
+  }
+
+  private appUrl(): string {
+    return this.config.get('APP_URL', { infer: true });
   }
 
   private hashToken(raw: string): string {

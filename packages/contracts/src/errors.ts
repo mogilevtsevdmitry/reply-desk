@@ -5,6 +5,7 @@ export const ErrorCodeSchema = z.enum([
   'VALIDATION_ERROR',
   'UNAUTHORIZED',
   'INVALID_CREDENTIALS',
+  'INVALID_TOKEN',
   'EMAIL_TAKEN',
   'FORBIDDEN',
   'NOT_FOUND',

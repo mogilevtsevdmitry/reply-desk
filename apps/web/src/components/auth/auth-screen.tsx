@@ -206,6 +206,14 @@ export function AuthScreen({ mode }: { mode: Mode }) {
               />
             </Field>
 
+            {mode === 'login' ? (
+              <p className="-mt-2 mb-5 text-right text-13">
+                <Link href="/forgot-password" className="text-accent hover:underline">
+                  {copy.loginForgotLink}
+                </Link>
+              </p>
+            ) : null}
+
             {mode === 'signup' ? (
               <div className="mb-5 flex flex-col gap-3">
                 {/* Чекбокс 1: соглашение + политика + согласие на обработку ПД */}

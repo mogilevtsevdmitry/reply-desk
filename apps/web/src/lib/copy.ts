@@ -50,6 +50,28 @@ export const copy = {
   errorCredentials:
     'Не нашли такое сочетание почты и пароля. Проверьте данные и попробуйте ещё раз',
 
+  // Восстановление пароля (/forgot-password, /reset-password)
+  loginForgotLink: 'Забыли пароль?',
+  forgotTitle: 'Восстановление пароля',
+  forgotSub: 'Укажите почту, на которую регистрировались, — пришлём ссылку для смены пароля',
+  forgotSubmit: 'Отправить ссылку',
+  forgotSuccessTitle: 'Проверьте почту',
+  forgotSuccess:
+    'Если такой адрес зарегистрирован, мы отправили письмо со ссылкой. Ссылка действует один час',
+  forgotBackToLogin: 'Вернуться ко входу',
+  resetTitle: 'Новый пароль',
+  resetSub: 'Придумайте новый пароль — после смены войдите с ним на всех устройствах',
+  resetPasswordLabel: 'Новый пароль',
+  resetPasswordRepeatLabel: 'Повторите пароль',
+  resetSubmit: 'Сменить пароль',
+  resetSuccessTitle: 'Пароль изменён',
+  resetSuccess: 'Теперь войдите с новым паролем',
+  resetSuccessLoginLink: 'Войти',
+  resetInvalidTokenTitle: 'Ссылка не сработала',
+  resetInvalidToken: 'Ссылка устарела или уже использована',
+  resetRequestNewLink: 'Запросить новую ссылку',
+  errorPasswordsMismatch: 'Пароли не совпадают — проверьте оба поля',
+
   // ---------- 2. Онбординг ----------
   onbStepperAria: 'Шаг настройки',
   onbStep1Name: 'Компания',

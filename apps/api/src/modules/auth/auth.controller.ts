@@ -3,11 +3,15 @@ import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import {
   AuthTokenResponse,
+  ForgotPasswordDto,
+  ForgotPasswordDtoSchema,
   LoginDto,
   LoginDtoSchema,
   RegisterDto,
   RegisterDtoSchema,
   RegisterResponse,
+  ResetPasswordDto,
+  ResetPasswordDtoSchema,
 } from '@replydesk/contracts';
 import type { Request, Response } from 'express';
 import { AppException } from '../../common/app.exception';
@@ -29,6 +33,18 @@ const AUTH_THROTTLE_LIMIT = process.env.THROTTLE_AUTH_LIMIT
 const AUTH_THROTTLE_TTL = process.env.THROTTLE_AUTH_TTL_MS
   ? parseInt(process.env.THROTTLE_AUTH_TTL_MS, 10)
   : 60_000;
+
+/**
+ * /auth/forgot-password — жёстче обычного auth-лимита: каждая попытка может
+ * породить письмо. Дефолт: 3 req/час по IP (ADR-043), переопределяется
+ * THROTTLE_FORGOT_LIMIT / THROTTLE_FORGOT_TTL_MS.
+ */
+const FORGOT_THROTTLE_LIMIT = process.env.THROTTLE_FORGOT_LIMIT
+  ? parseInt(process.env.THROTTLE_FORGOT_LIMIT, 10)
+  : 3;
+const FORGOT_THROTTLE_TTL = process.env.THROTTLE_FORGOT_TTL_MS
+  ? parseInt(process.env.THROTTLE_FORGOT_TTL_MS, 10)
+  : 3_600_000;
 
 @Public()
 @Throttle({ default: { limit: AUTH_THROTTLE_LIMIT, ttl: AUTH_THROTTLE_TTL } })
@@ -56,6 +72,28 @@ export class AuthController {
     const tokens = await this.authService.login(dto);
     this.setRefreshCookie(res, tokens);
     return { accessToken: tokens.accessToken };
+  }
+
+  /**
+   * Запрос восстановления пароля. ВСЕГДА 204 — существование аккаунта
+   * не раскрывается (ADR-043). Письмо уходит только реальному пользователю.
+   */
+  @Post('forgot-password')
+  @HttpCode(204)
+  @Throttle({ default: { limit: FORGOT_THROTTLE_LIMIT, ttl: FORGOT_THROTTLE_TTL } })
+  async forgotPassword(
+    @Body(new ZodValidationPipe(ForgotPasswordDtoSchema)) dto: ForgotPasswordDto,
+  ): Promise<void> {
+    await this.authService.forgotPassword(dto);
+  }
+
+  /** Сброс пароля по токену из письма: 204 или 422 INVALID_TOKEN (ADR-043). */
+  @Post('reset-password')
+  @HttpCode(204)
+  async resetPassword(
+    @Body(new ZodValidationPipe(ResetPasswordDtoSchema)) dto: ResetPasswordDto,
+  ): Promise<void> {
+    await this.authService.resetPassword(dto);
   }
 
   @Post('refresh')

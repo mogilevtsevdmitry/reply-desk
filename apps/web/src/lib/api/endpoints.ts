@@ -22,9 +22,11 @@ import {
   type CreateReviewDto,
   type CreateReviewResponse,
   type ListReviewsResponse,
+  type ForgotPasswordDto,
   type LoginDto,
   type RegisterDto,
   type RegisterResponse,
+  type ResetPasswordDto,
   type ReviewWithGeneration,
   type UpdateCompanyDto,
 } from '@replydesk/contracts';
@@ -40,6 +42,16 @@ export const login = (dto: LoginDto): Promise<AuthTokenResponse> =>
 
 export const logout = async (): Promise<void> => {
   await apiRequest('/auth/logout', { method: 'POST' });
+};
+
+/** Всегда 204 — существование аккаунта не раскрывается (ADR-043). */
+export const forgotPassword = async (dto: ForgotPasswordDto): Promise<void> => {
+  await apiRequest('/auth/forgot-password', { method: 'POST', body: dto });
+};
+
+/** 204 — пароль изменён, все сессии разлогинены; 422 INVALID_TOKEN — ссылка невалидна. */
+export const resetPassword = async (dto: ResetPasswordDto): Promise<void> => {
+  await apiRequest('/auth/reset-password', { method: 'POST', body: dto });
 };
 
 // ---------- Company ----------

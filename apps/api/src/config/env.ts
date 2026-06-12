@@ -77,6 +77,28 @@ export const EnvSchema = z.object({
   PRICE_PACK_50: z.coerce.number().int().positive().default(50_000),
   PRICE_PACK_100: z.coerce.number().int().positive().default(100_000),
 
+  // --- Почта (nodemailer, ADR-044) ---
+  // Без SMTP_HOST модуль работает в dev-режиме `log`: письмо целиком пишется
+  // в pino-лог уровнем info с пометкой [mail:dev], сеть не используется.
+  SMTP_HOST: z
+    .string()
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
+  SMTP_PORT: z.coerce.number().int().positive().default(465),
+  SMTP_SECURE: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  SMTP_USER: z
+    .string()
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
+  SMTP_PASS: z
+    .string()
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
+  MAIL_FROM: z.string().default('ReplyDesk <noreply@replydesk.ru>'),
+
   // --- Rate limiting (@nestjs/throttler) ---
   // Глобальный лимит (req/ttl): дефолт 60 req/60s
   THROTTLE_DEFAULT_LIMIT: z.coerce.number().int().positive().default(60),
@@ -84,6 +106,9 @@ export const EnvSchema = z.object({
   // Auth-лимит (/auth/*): дефолт 10 req/60s
   THROTTLE_AUTH_LIMIT: z.coerce.number().int().positive().default(10),
   THROTTLE_AUTH_TTL_MS: z.coerce.number().int().positive().default(60_000),
+  // Лимит POST /auth/forgot-password: дефолт 3 req/час по IP (ADR-043)
+  THROTTLE_FORGOT_LIMIT: z.coerce.number().int().positive().default(3),
+  THROTTLE_FORGOT_TTL_MS: z.coerce.number().int().positive().default(3_600_000),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

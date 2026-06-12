@@ -21,6 +21,23 @@ export type RegisterDto = z.infer<typeof RegisterDtoSchema>;
 export const LoginDtoSchema = CredentialsSchema;
 export type LoginDto = z.infer<typeof LoginDtoSchema>;
 
+/** Запрос восстановления пароля: всегда 204, существование аккаунта не раскрывается (ADR-043). */
+export const ForgotPasswordDtoSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(254),
+});
+export type ForgotPasswordDto = z.infer<typeof ForgotPasswordDtoSchema>;
+
+/**
+ * Сброс пароля по токену из письма. Требования к паролю — как при регистрации.
+ * Невалидный/истёкший/использованный токен → 422 INVALID_TOKEN (одно сообщение
+ * на все случаи). Успех → 204, все refresh-токены пользователя ревокуются.
+ */
+export const ResetPasswordDtoSchema = z.object({
+  token: z.string().min(1).max(128),
+  password: z.string().min(8).max(72),
+});
+export type ResetPasswordDto = z.infer<typeof ResetPasswordDtoSchema>;
+
 export const UserDtoSchema = z.object({
   id: z.string(),
   email: z.string().email(),

@@ -17,6 +17,7 @@ model User {
   companyId     String?        @unique
   company       Company?       @relation(fields: [companyId], references: [id])
   refreshTokens RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
   createdAt     DateTime       @default(now())
 
   // Фиксация фактов согласий при регистрации (доказуемость, 152-ФЗ).
@@ -33,6 +34,19 @@ model RefreshToken {
   tokenHash String    @unique
   expiresAt DateTime
   revokedAt DateTime?
+}
+
+// Токен сброса пароля (ADR-043): opaque-токен уходит в письмо,
+// в БД — только sha256-хэш (по образцу refresh-токенов, ADR-016).
+// TTL 1 час, одноразовый (usedAt), новые запросы инвалидируют старые токены.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 }
 
 model Company {

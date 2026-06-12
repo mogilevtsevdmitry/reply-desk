@@ -30,6 +30,18 @@ model RefreshToken {
   revokedAt DateTime?
 }
 
+// Токен сброса пароля (ADR-043): в письмо уходит opaque-токен,
+// в БД — sha256-хэш (по образцу ADR-016). TTL 1 час, одноразовый.
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+}
+
 model Company {
   id          String   @id @default(cuid())
   name        String
@@ -104,6 +116,13 @@ POST /auth/register        { email, password, acceptTerms: true, acceptLlm: true
 POST /auth/login           { email, password } → { accessToken } + set-cookie refresh
 POST /auth/refresh         (cookie) → { accessToken }
 POST /auth/logout          → 204, ревокация refresh
+POST /auth/forgot-password { email } → ВСЕГДА 204 (ADR-043): существование аккаунта не
+                           // раскрывается ни ответом, ни таймингом; письмо со ссылкой
+                           // {APP_URL}/reset-password?token=... уходит только реальному
+                           // пользователю; rate limit 3 req/час по IP
+POST /auth/reset-password  { token, password } → 204: смена пароля (bcrypt 12), токен
+                           // одноразово гасится, ВСЕ refresh-токены ревокуются;
+                           // нет/использован/истёк → 422 INVALID_TOKEN (одно сообщение)
 
 GET  /company/me           → Company
 POST /company              { name, niche, toneOfVoice } → { company, accessToken }
@@ -184,10 +203,10 @@ User = текст отзыва + рейтинг + источник.
 
 `AuthModule` (bcrypt cost 12, JWT guard), `CompanyModule`, `ReviewsModule`,
 `GenerationModule` (producer + worker + SSE-контроллер), `LlmModule` (провайдер за DI-токеном),
-`UsageModule` (модель «резервирование»: атомарный инкремент UsageCounter в transaction
+`MailModule` (nodemailer; без SMTP_HOST — dev-режим log: письмо в pino-лог с пометкой [mail:dev], ADR-044), `UsageModule` (модель «резервирование»: атомарный инкремент UsageCounter в transaction
 при POST /reviews — конкурентные запросы не пробивают лимит;
 декремент-компенсация при FAILED; FREE=10, START=100, BUSINESS=1000 — значения в env). Глобально: helmet, CORS по env-whitelist, rate limit
-(@nestjs/throttler: 10 req/min на /auth/*, 60 req/min на остальное), pino-логгер
+(@nestjs/throttler: 10 req/min на /auth/*, 3 req/час на /auth/forgot-password, 60 req/min на остальное), pino-логгер
 (без текстов отзывов в логах — только id).
 
 ## 4.1. Billing — биллинг через ЮKassa (ADR-035..038)

@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { AppException } from '../../common/app.exception';
 import type { Env } from '../../config/env';
 import type { PrismaService } from '../../prisma/prisma.service';
+import type { MailService } from '../mail/mail.service';
 import { AuthService, CONSENT_DOCS_VERSION } from './auth.service';
 
 /** Тесты ротации refresh-токена, детекта повторного использования и login-флоу. БД мокается. */
@@ -21,18 +22,25 @@ jest.mock('bcryptjs', () => {
 const sha256 = (raw: string): string => createHash('sha256').update(raw).digest('hex');
 
 interface PrismaMock {
-  user: { findUnique: jest.Mock; create: jest.Mock };
+  user: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
   refreshToken: {
     findUnique: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
     updateMany: jest.Mock;
   };
+  passwordResetToken: {
+    findUnique: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+    updateMany: jest.Mock;
+  };
+  $transaction: jest.Mock;
 }
 
 function makePrisma(): PrismaMock {
   return {
-    user: { findUnique: jest.fn(), create: jest.fn() },
+    user: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
     refreshToken: {
       findUnique: jest.fn(),
       create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
@@ -43,7 +51,24 @@ function makePrisma(): PrismaMock {
       update: jest.fn(),
       updateMany: jest.fn(),
     },
+    passwordResetToken: {
+      findUnique: jest.fn(),
+      create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+        id: 'prt-new',
+        usedAt: null,
+        createdAt: new Date(),
+        ...data,
+      })),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    // $transaction(promises[]) — в моках достаточно дождаться переданных промисов
+    $transaction: jest.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)),
   };
+}
+
+function makeMail(): { send: jest.Mock; mode: 'log' } {
+  return { send: jest.fn(async () => undefined), mode: 'log' };
 }
 
 function makeJwt(): { sign: jest.Mock } {
@@ -51,17 +76,22 @@ function makeJwt(): { sign: jest.Mock } {
 }
 
 function makeConfig(): ConfigService<Env, true> {
-  const env: Partial<Env> = { REFRESH_TTL_DAYS: 30, NODE_ENV: 'test' };
+  const env: Partial<Env> = {
+    REFRESH_TTL_DAYS: 30,
+    NODE_ENV: 'test',
+    APP_URL: 'http://localhost:3001',
+  };
   return {
     get: jest.fn((key: keyof Env) => env[key]),
   } as unknown as ConfigService<Env, true>;
 }
 
-function makeService(prisma: PrismaMock, jwt = makeJwt()): AuthService {
+function makeService(prisma: PrismaMock, jwt = makeJwt(), mail = makeMail()): AuthService {
   return new AuthService(
     prisma as unknown as PrismaService,
     jwt as unknown as JwtService,
     makeConfig(),
+    mail as unknown as MailService,
   );
 }
 
@@ -259,5 +289,150 @@ describe('AuthService — регистрация с согласиями (152-Ф
 
     expect(RegisterDtoSchema.safeParse({ ...dto, acceptTerms: false }).success).toBe(false);
     expect(RegisterDtoSchema.safeParse({ ...dto, acceptLlm: false }).success).toBe(false);
+  });
+
+  it('после успешной регистрации отправляется приветственное письмо (fire-and-forget)', async () => {
+    const prisma = makePrisma();
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.create.mockImplementation(
+      async ({ data }: { data: Record<string, unknown> }) => ({
+        id: 'u-new',
+        companyId: null,
+        createdAt: new Date(),
+        ...data,
+      }),
+    );
+    const mail = makeMail();
+    const service = makeService(prisma, makeJwt(), mail);
+
+    await service.register(dto);
+
+    expect(mail.send).toHaveBeenCalledTimes(1);
+    const message = mail.send.mock.calls[0]![0] as { to: string; subject: string };
+    expect(message.to).toBe(dto.email);
+    expect(message.subject).toContain('Добро пожаловать');
+  });
+
+  it('ошибка регистрации (EMAIL_TAKEN) — письмо не отправляется', async () => {
+    const prisma = makePrisma();
+    prisma.user.findUnique.mockResolvedValue(user);
+    const mail = makeMail();
+    const service = makeService(prisma, makeJwt(), mail);
+
+    await expect(service.register(dto)).rejects.toMatchObject({ code: 'EMAIL_TAKEN' });
+    expect(mail.send).not.toHaveBeenCalled();
+  });
+});
+
+describe('AuthService — forgot-password (ADR-043)', () => {
+  it('юзер есть и юзера нет — оба запроса резолвятся без ошибки (несгораемый 204)', async () => {
+    const prisma = makePrisma();
+    const service = makeService(prisma);
+
+    prisma.user.findUnique.mockResolvedValue(null);
+    await expect(service.forgotPassword({ email: 'ghost@example.com' })).resolves.toBeUndefined();
+
+    prisma.user.findUnique.mockResolvedValue(user);
+    await expect(service.forgotPassword({ email: user.email })).resolves.toBeUndefined();
+  });
+
+  it('юзера нет: фиктивный bcrypt-compare (timing-safe), токен не создаётся, письмо не уходит', async () => {
+    const prisma = makePrisma();
+    const mail = makeMail();
+    const service = makeService(prisma, makeJwt(), mail);
+    prisma.user.findUnique.mockResolvedValue(null);
+    const compareMock = bcrypt.compare as unknown as jest.Mock;
+    compareMock.mockClear();
+
+    await service.forgotPassword({ email: 'ghost@example.com' });
+
+    expect(compareMock).toHaveBeenCalledTimes(1);
+    expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
+    expect(mail.send).not.toHaveBeenCalled();
+  });
+
+  it('юзер есть: старые токены инвалидируются, создаётся sha256-хэш, в письме ссылка с raw-токеном', async () => {
+    const prisma = makePrisma();
+    const mail = makeMail();
+    const service = makeService(prisma, makeJwt(), mail);
+    prisma.user.findUnique.mockResolvedValue(user);
+
+    await service.forgotPassword({ email: user.email });
+
+    // инвалидация прежних неиспользованных токенов
+    expect(prisma.passwordResetToken.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'u1', usedAt: null },
+      data: { usedAt: expect.any(Date) },
+    });
+    // в БД — sha256-хэш, в письме — raw-токен из той же пары
+    const createArg = prisma.passwordResetToken.create.mock.calls[0]![0] as {
+      data: { tokenHash: string; expiresAt: Date };
+    };
+    const message = mail.send.mock.calls[0]![0] as { to: string; text: string };
+    expect(message.to).toBe(user.email);
+    const tokenMatch = /token=([0-9a-f]{64})/.exec(message.text);
+    expect(tokenMatch).not.toBeNull();
+    expect(createArg.data.tokenHash).toBe(sha256(tokenMatch![1]!));
+    // TTL ≈ 1 час
+    expect(createArg.data.expiresAt.getTime() - Date.now()).toBeGreaterThan(55 * 60 * 1000);
+    expect(createArg.data.expiresAt.getTime() - Date.now()).toBeLessThanOrEqual(60 * 60 * 1000);
+  });
+});
+
+describe('AuthService — reset-password (ADR-043)', () => {
+  const validStored = (over: Partial<Record<string, unknown>> = {}) => ({
+    id: 'prt1',
+    userId: 'u1',
+    tokenHash: sha256('raw-reset-token'),
+    expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+    usedAt: null,
+    createdAt: new Date(),
+    ...over,
+  });
+
+  it('успех: пароль перехэширован, токен погашен, ВСЕ refresh-токены ревокованы', async () => {
+    const prisma = makePrisma();
+    prisma.passwordResetToken.findUnique.mockResolvedValue(validStored());
+    const service = makeService(prisma);
+
+    await service.resetPassword({ token: 'raw-reset-token', password: 'NewPassword123' });
+
+    const userUpdate = prisma.user.update.mock.calls[0]![0] as {
+      where: { id: string };
+      data: { passwordHash: string };
+    };
+    expect(userUpdate.where.id).toBe('u1');
+    expect(userUpdate.data.passwordHash).toMatch(/^\$2[aby]\$/);
+    expect(await bcrypt.compare('NewPassword123', userUpdate.data.passwordHash)).toBe(true);
+
+    expect(prisma.passwordResetToken.update).toHaveBeenCalledWith({
+      where: { id: 'prt1' },
+      data: { usedAt: expect.any(Date) },
+    });
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'u1', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+  });
+
+  it.each([
+    ['несуществующий токен', null],
+    ['использованный токен', { usedAt: new Date() }],
+    ['истёкший токен', { expiresAt: new Date(Date.now() - 1000) }],
+  ])('%s → 422 INVALID_TOKEN с единым сообщением, пароль не меняется', async (_label, over) => {
+    const prisma = makePrisma();
+    prisma.passwordResetToken.findUnique.mockResolvedValue(over === null ? null : validStored(over));
+    const service = makeService(prisma);
+
+    const err = await service
+      .resetPassword({ token: 'raw-reset-token', password: 'NewPassword123' })
+      .catch((e: AppException) => e);
+
+    expect(err).toBeInstanceOf(AppException);
+    expect((err as AppException).code).toBe('INVALID_TOKEN');
+    expect((err as AppException).getStatus()).toBe(422);
+    expect((err as AppException).message).toBe('Ссылка устарела или уже использована');
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
   });
 });
