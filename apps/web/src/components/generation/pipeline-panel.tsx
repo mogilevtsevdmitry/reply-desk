@@ -1,38 +1,25 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import { copy } from '@/lib/copy';
-import { Button } from '../ui/button';
 
 /**
  * Signature-анимация: рейка из четырёх узлов с бегущим лучом (MOTION.md).
  * Анимация событийная: узел активируется при получении SSE-события
  * (маппинг статусов — в generation-run.tsx), не по локальному таймеру.
+ * При FAILED узел получает is-failed и луч замирает; блок ошибки и кнопка
+ * «Повторить генерацию» показываются на форме (ADR-042, generate-page.tsx).
  */
 export function PipelinePanel({
   reviewText,
   stage,
   failedStage,
-  onRetry,
-  retryPending,
 }: {
   reviewText: string;
   /** Активный узел 0..3; узлы левее — is-done. */
   stage: number;
   /** Узел, на котором пришёл FAILED, или null. */
   failedStage: number | null;
-  onRetry: () => void;
-  retryPending: boolean;
 }) {
-  const retryRef = useRef<HTMLDivElement>(null);
-
-  // Фокус переводится на кнопку «Повторить генерацию» программно (MOTION.md)
-  useEffect(() => {
-    if (failedStage !== null) {
-      retryRef.current?.querySelector('button')?.focus();
-    }
-  }, [failedStage]);
-
   const fillPct = (100 / 3) * Math.min(failedStage ?? stage, 3);
 
   return (
@@ -79,21 +66,8 @@ export function PipelinePanel({
           aria-live="polite"
           className="m-0 mt-6 min-h-[1.6em] text-center text-14 text-ink-muted"
         >
-          {failedStage === null ? copy.pipeStatuses[stage] : ''}
+          {failedStage === null ? copy.pipeStatuses[stage] : copy.failedTitle}
         </p>
-
-        {failedStage !== null ? (
-          <div
-            ref={retryRef}
-            className="pl-error-enter mt-6 border-t border-line pt-6 text-center"
-          >
-            <p className="m-0 mb-2 font-semibold text-ink">{copy.failedTitle}</p>
-            <p className="m-0 mb-4 text-14 text-ink-muted">{copy.failedText}</p>
-            <Button variant="secondary" onClick={onRetry} disabled={retryPending}>
-              {copy.failedRetry}
-            </Button>
-          </div>
-        ) : null}
       </div>
     </section>
   );

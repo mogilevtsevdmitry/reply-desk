@@ -18,12 +18,6 @@ export const CreateReviewResponseSchema = z.object({
 });
 export type CreateReviewResponse = z.infer<typeof CreateReviewResponseSchema>;
 
-/** Ответ POST /reviews/:id/retry → 202 (только из статуса FAILED, ADR-003). */
-export const RetryReviewResponseSchema = z.object({
-  generationId: z.string(),
-});
-export type RetryReviewResponse = z.infer<typeof RetryReviewResponseSchema>;
-
 /** Query-параметры GET /reviews. */
 export const ListReviewsQuerySchema = z.object({
   source: ReviewSourceSchema.optional(),

@@ -6,7 +6,6 @@ import {
   ListReviewsQuery,
   ListReviewsQuerySchema,
   ListReviewsResponse,
-  RetryReviewResponse,
   ReviewWithGeneration,
 } from '@replydesk/contracts';
 import { CurrentCompanyId } from '../../common/decorators';
@@ -41,15 +40,5 @@ export class ReviewsController {
     @Param('id') id: string,
   ): Promise<ReviewWithGeneration> {
     return this.reviewsService.getOne(companyId, id);
-  }
-
-  /** Ретрай только из FAILED (409 иначе), повторное резервирование лимита (ADR-003). */
-  @Post(':id/retry')
-  @HttpCode(202)
-  async retry(
-    @CurrentCompanyId() companyId: string,
-    @Param('id') id: string,
-  ): Promise<RetryReviewResponse> {
-    return this.reviewsService.retry(companyId, id);
   }
 }

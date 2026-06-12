@@ -2,10 +2,9 @@
 
 import type { GenerationPayload, GenStatus } from '@replydesk/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { isApiError } from '@/lib/api/client';
-import { getReview, retryReview } from '@/lib/api/endpoints';
+import { getReview } from '@/lib/api/endpoints';
 import { SseLostError, streamGenerationEvents } from '@/lib/api/sse';
 import { copy } from '@/lib/copy';
 import { COMPANY_ME_KEY, useReducedMotion } from '@/lib/hooks';
@@ -27,28 +26,35 @@ const STATUS_STAGE: Partial<Record<GenStatus, number>> = {
 const DONE_HOLD_MS = 900;
 
 /**
+ * Удержание замершей рейки после FAILED перед возвратом к форме (ADR-042):
+ * узел получает is-failed, луч замирает, затем пользователь возвращается
+ * к форме с заполненными полями и кнопкой «Повторить генерацию».
+ */
+const FAILED_HOLD_MS = 900;
+
+/**
  * Оркестрация одного запуска генерации: подписка на SSE-статусы,
- * событийная анимация пайплайна, FAILED + ретрай, обрыв SSE.
+ * событийная анимация пайплайна, обрыв SSE. При FAILED (ADR-042: отзыв
+ * на сервере удалён, лимит компенсирован) — возврат к форме через onFailed.
  */
 export function GenerationRun({
   reviewId,
   generationId,
   reviewText,
   onDone,
+  onFailed,
 }: {
   reviewId: string;
   generationId: string;
   reviewText: string;
   onDone: (payload: GenerationPayload) => void;
+  onFailed: () => void;
 }) {
-  const router = useRouter();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const reduced = useReducedMotion();
-  const [currentGenerationId, setCurrentGenerationId] = useState(generationId);
   const [stage, setStage] = useState(0);
   const [failedStage, setFailedStage] = useState<number | null>(null);
-  const [retryPending, setRetryPending] = useState(false);
 
   const stageRef = useRef(0);
   const reducedRef = useRef(reduced);
@@ -98,7 +104,7 @@ export function GenerationRun({
     };
 
     void streamGenerationEvents(
-      currentGenerationId,
+      generationId,
       (event) => {
         if (abort.signal.aborted || finished) return;
         const mapped = STATUS_STAGE[event.status];
@@ -118,10 +124,16 @@ export function GenerationRun({
         }
         if (event.status === 'FAILED') {
           finished = true;
-          // Узел k получает is-failed, луч замирает (MOTION.md)
+          // Узел k получает is-failed, луч замирает (MOTION.md); лимит
+          // компенсирован, отзыв удалён на сервере (ADR-042)
           setFailedStage(stageRef.current);
           void queryClient.invalidateQueries({ queryKey: COMPANY_ME_KEY });
           void queryClient.invalidateQueries({ queryKey: ['reviews'] });
+          const back = (): void => {
+            if (!abort.signal.aborted) onFailed();
+          };
+          if (reducedRef.current) back();
+          else holdTimer = setTimeout(back, FAILED_HOLD_MS);
         }
       },
       abort.signal,
@@ -142,39 +154,14 @@ export function GenerationRun({
       abort.abort();
       if (holdTimer) clearTimeout(holdTimer);
     };
-  }, [currentGenerationId, reviewId]); // намеренно: подписка пересоздаётся только по id генерации
-
-  const handleRetry = async (): Promise<void> => {
-    setRetryPending(true);
-    try {
-      const { generationId: nextId } = await retryReview(reviewId);
-      // Рейка перезапускается с нулевого узла, луч обнуляется без анимации
-      // (PipelinePanel размонтируется по key = generationId)
-      setCurrentGenerationId(nextId);
-    } catch (err) {
-      if (isApiError(err) && err.code === 'LIMIT_EXCEEDED') {
-        router.push('/app/upgrade');
-      } else if (isApiError(err) && err.code === 'CONFLICT') {
-        // Генерация уже не в FAILED (двойной клик) — просто переподписываемся
-        setCurrentGenerationId((id) => id);
-      } else if (isApiError(err) && err.code === 'NETWORK') {
-        showToast(copy.errorNetwork, 'error');
-      } else {
-        showToast(copy.errorServer, 'error');
-      }
-    } finally {
-      setRetryPending(false);
-    }
-  };
+  }, [generationId, reviewId]); // намеренно: подписка пересоздаётся только по id генерации
 
   return (
     <PipelinePanel
-      key={currentGenerationId}
+      key={generationId}
       reviewText={reviewText}
       stage={stage}
       failedStage={failedStage}
-      onRetry={() => void handleRetry()}
-      retryPending={retryPending}
     />
   );
 }

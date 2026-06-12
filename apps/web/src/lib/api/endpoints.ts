@@ -9,7 +9,6 @@ import {
   CreateReviewResponseSchema,
   ListReviewsResponseSchema,
   RegisterResponseSchema,
-  RetryReviewResponseSchema,
   ReviewWithGenerationSchema,
   type AuthTokenResponse,
   type BillingOverview,
@@ -26,7 +25,6 @@ import {
   type LoginDto,
   type RegisterDto,
   type RegisterResponse,
-  type RetryReviewResponse,
   type ReviewWithGeneration,
   type UpdateCompanyDto,
 } from '@replydesk/contracts';
@@ -79,9 +77,6 @@ export const cancelSubscription = (): Promise<CancelSubscriptionResponse> =>
 
 export const createReview = (dto: CreateReviewDto): Promise<CreateReviewResponse> =>
   apiJson('/reviews', CreateReviewResponseSchema, { method: 'POST', body: dto });
-
-export const retryReview = (reviewId: string): Promise<RetryReviewResponse> =>
-  apiJson(`/reviews/${reviewId}/retry`, RetryReviewResponseSchema, { method: 'POST' });
 
 export const getReview = (reviewId: string): Promise<ReviewWithGeneration> =>
   apiJson(`/reviews/${reviewId}`, ReviewWithGenerationSchema);

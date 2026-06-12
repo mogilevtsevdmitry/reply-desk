@@ -117,9 +117,7 @@ POST /reviews              { source, rating?, authorName?, rawText } → 202 { r
                            // в ОДНОЙ транзакции: атомарное резервирование лимита (инкремент
                            // UsageCounter) + создание Review + Generation(PENDING); затем job в BullMQ
                            // 402 LIMIT_EXCEEDED если лимит периода исчерпан
-POST /reviews/:id/retry    → 202 { generationId }
-                           // только для Generation в статусе FAILED, иначе 409;
-                           // заново резервирует лимит (402 если исчерпан), статус → PENDING, job в очередь
+                           // ретрай-эндпоинта нет (ADR-042): повтор после FAILED — обычный POST /reviews
 GET  /reviews              ?source&category&severity&from&to&page&pageSize → { items[], total }
 GET  /reviews/:id          → Review + Generation
 GET  /generations/:id/events   // SSE: { status } ... финальный { status: DONE, payload }
@@ -147,9 +145,11 @@ interface LlmProvider {
 
 1. status → ANALYZING (публикация в Redis pub/sub канал `gen:{id}` для SSE)
 2. Поиск похожих (pg_trgm, строго параметризованный запрос):
-   `SELECT id, "rawText", category, similarity("rawText", $3) AS sim FROM "Review"
+   `SELECT id, "rawText", category, similarity("rawText", $3) AS sim FROM "Review" r
    WHERE "companyId" = $1 AND id != $2 AND similarity("rawText", $3) > $4
-   ORDER BY sim DESC LIMIT 5` — порог $4 из env SIMILARITY_THRESHOLD (default 0.3).
+   AND EXISTS (SELECT 1 FROM "Generation" g WHERE g."reviewId" = r.id AND g.status = 'DONE')
+   ORDER BY sim DESC LIMIT 5` — порог $4 из env SIMILARITY_THRESHOLD (default 0.3);
+   кандидаты — только отзывы с успешной генерацией (ADR-042, страховка от строк в полёте).
    Кандидаты передаются в промпт; финальное решение isRepeat/similarReviewIds принимает LLM
 3. status → GENERATING
 4. Сборка system-промпта (см. ниже), один вызов `generateStructured` с полной схемой пакета
@@ -157,8 +157,10 @@ interface LlmProvider {
    (произвольные/чужие id отбрасываются)
 6. Сохранить Generation, обновить Review.category/severity/isFakeSusp, status → DONE
    (лимит уже зарезервирован при POST /reviews — здесь НЕ инкрементировать)
-7. Любая ошибка → status FAILED + error + компенсация лимита (атомарный декремент
-   UsageCounter, не ниже 0)
+7. Любая ошибка (ADR-042, строго по порядку): компенсация лимита в источник из job
+   (атомарный декремент, не ниже 0) → публикация финального SSE-события
+   { status: FAILED, error } в gen:{id} → удаление Review (cascade удаляет Generation).
+   FAILED-строки в БД не сохраняются: история и trgm-кандидаты не загрязняются
 
 ### Сборка промпта
 
@@ -183,7 +185,7 @@ User = текст отзыва + рейтинг + источник.
 `AuthModule` (bcrypt cost 12, JWT guard), `CompanyModule`, `ReviewsModule`,
 `GenerationModule` (producer + worker + SSE-контроллер), `LlmModule` (провайдер за DI-токеном),
 `UsageModule` (модель «резервирование»: атомарный инкремент UsageCounter в transaction
-при POST /reviews и /reviews/:id/retry — конкурентные запросы не пробивают лимит;
+при POST /reviews — конкурентные запросы не пробивают лимит;
 декремент-компенсация при FAILED; FREE=10, START=100, BUSINESS=1000 — значения в env). Глобально: helmet, CORS по env-whitelist, rate limit
 (@nestjs/throttler: 10 req/min на /auth/*, 60 req/min на остальное), pino-логгер
 (без текстов отзывов в логах — только id).
@@ -276,8 +278,10 @@ checkout 503), `CRON_SECRET`, `APP_URL`, `PRICE_{START|BUSINESS}_{1|3|6|12}M`,
 «Исходный отзыв» (имя клиента, бейдж площадки, оценка звёздами, дата, полный текст;
 общий компонент для экрана результата и /app/reviews/[id]). SSE — fetch-based
 (fetch + ReadableStream с заголовком Authorization; нативный EventSource не умеет
-заголовки — не использовать, токен в query запрещён). При FAILED — понятное сообщение
-и кнопка «Повторить» (POST /reviews/:id/retry). Копирование через
+заголовки — не использовать, токен в query запрещён). При FAILED (ADR-042: отзыв на
+сервере удалён, лимит компенсирован) — возврат к форме с сохранёнными полями, сообщение
+«Лимит не потрачен, текст остался в форме» и кнопка «Повторить генерацию», которая шлёт
+текущее содержимое формы новым POST /reviews. Копирование через
 navigator.clipboard + тост. Остаток лимита виден всегда; при 402 — экран апгрейда (заглушка).
 Состояние сервера — TanStack Query; access-токен в памяти, авто-refresh по 401 (interceptor).
 

@@ -8,7 +8,8 @@ import type { UsageService } from '../usage/usage.service';
 import { GenerationPipelineService } from './generation-pipeline.service';
 
 /**
- * Пайплайн воркера: маппинг ошибок LLM в FAILED + компенсация лимита (ADR-002),
+ * Пайплайн воркера: ошибки LLM → компенсация лимита (ADR-002) → финальное
+ * SSE-событие FAILED → удаление Review (ADR-042, упавшая генерация не сохраняется);
  * публикация переходов статуса в Redis pub/sub, фильтрация similarReviewIds.
  */
 
@@ -31,7 +32,7 @@ interface Setup {
   service: GenerationPipelineService;
   prisma: {
     generation: { findUnique: jest.Mock; update: jest.Mock };
-    review: { update: jest.Mock };
+    review: { update: jest.Mock; deleteMany: jest.Mock };
     $queryRaw: jest.Mock;
     $transaction: jest.Mock;
   };
@@ -63,7 +64,7 @@ function setup(llmResult: () => Promise<{ data: unknown; tokensUsed: number }>):
       })),
       update: jest.fn(async () => ({})),
     },
-    review: { update: jest.fn(async () => ({})) },
+    review: { update: jest.fn(async () => ({})), deleteMany: jest.fn(async () => ({ count: 1 })) },
     $queryRaw: jest.fn(async () => [
       { id: 'candidate-1', rawText: 'похожий', category: 'SERVICE', createdAt: new Date(), sim: 0.7 },
     ]),
@@ -121,9 +122,10 @@ describe('GenerationPipelineService — пайплайн воркера', () => 
       data: { category: 'SERVICE', severity: 3, isFakeSusp: false },
     });
     expect(usage.compensate).not.toHaveBeenCalled();
+    expect(prisma.review.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('ошибка LLM → FAILED + error + компенсация лимита периода из job', async () => {
+  it('ошибка LLM → компенсация + SSE FAILED + удаление Review (ADR-042); статус FAILED в БД не пишется', async () => {
     const { service, prisma, usage, redis } = setup(async () => {
       throw new LlmInvalidOutputError('невалидный вывод');
     });
@@ -131,27 +133,42 @@ describe('GenerationPipelineService — пайплайн воркера', () => 
     await service.process(JOB);
 
     expect(publishedStatuses(redis)).toEqual(['ANALYZING', 'GENERATING', 'FAILED']);
-    expect(prisma.generation.update).toHaveBeenCalledWith({
-      where: { id: 'gen-1' },
-      data: { status: 'FAILED', error: expect.stringContaining('некорректный результат') },
-    });
     expect(usage.compensate).toHaveBeenCalledWith('company-1', '2026-06', 'PLAN');
 
-    // Текст отзыва не попадает в сохранённую ошибку.
-    const failedCall = prisma.generation.update.mock.calls.find(
+    // Review удаляется (cascade удалит Generation); статус FAILED в БД не сохраняется.
+    expect(prisma.review.deleteMany).toHaveBeenCalledWith({ where: { id: 'review-1' } });
+    const failedStatusWrite = prisma.generation.update.mock.calls.find(
       (c) => (c[0] as { data: { status?: string } }).data.status === 'FAILED',
     );
-    expect((failedCall![0] as { data: { error: string } }).data.error).not.toContain('Текст отзыва');
+    expect(failedStatusWrite).toBeUndefined();
+
+    // Финальное событие содержит понятную ошибку без текста отзыва.
+    const failedEvent = redis.publish.mock.calls
+      .map((c) => JSON.parse(c[1] as string) as { status: string; error?: string })
+      .find((e) => e.status === 'FAILED');
+    expect(failedEvent?.error).toContain('некорректный результат');
+    expect(failedEvent?.error).not.toContain('Текст отзыва');
+
+    // Порядок: компенсация → публикация FAILED → удаление (событие уходит до удаления).
+    const compensateOrder = usage.compensate.mock.invocationCallOrder[0]!;
+    const publishFailedIdx = redis.publish.mock.calls.findIndex(
+      (c) => (JSON.parse(c[1] as string) as { status: string }).status === 'FAILED',
+    );
+    const publishOrder = redis.publish.mock.invocationCallOrder[publishFailedIdx]!;
+    const deleteOrder = prisma.review.deleteMany.mock.invocationCallOrder[0]!;
+    expect(compensateOrder).toBeLessThan(publishOrder);
+    expect(publishOrder).toBeLessThan(deleteOrder);
   });
 
   it('FAILED при списании из пакета → компенсация в источник PACKAGE (ADR-037)', async () => {
-    const { service, usage } = setup(async () => {
+    const { service, prisma, usage } = setup(async () => {
       throw new LlmInvalidOutputError('невалидный вывод');
     });
 
     await service.process({ ...JOB, usageSource: 'PACKAGE' });
 
     expect(usage.compensate).toHaveBeenCalledWith('company-1', '2026-06', 'PACKAGE');
+    expect(prisma.review.deleteMany).toHaveBeenCalledWith({ where: { id: 'review-1' } });
   });
 
   it('несуществующая генерация → job тихо пропускается без падения', async () => {

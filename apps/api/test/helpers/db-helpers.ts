@@ -26,6 +26,30 @@ export async function getUsageCounter(
   return counter?.used ?? 0;
 }
 
+/**
+ * Ждёт удаления Review из БД (ADR-042: воркер удаляет отзыв при FAILED;
+ * cascade удаляет Generation).
+ */
+export async function waitForReviewDeleted(
+  app: INestApplication,
+  reviewId: string,
+  timeoutMs = 30_000,
+): Promise<void> {
+  const prisma = app.get(PrismaService);
+  const start = Date.now();
+
+  while (Date.now() - start < timeoutMs) {
+    const review = await prisma.review.findUnique({
+      where: { id: reviewId },
+      select: { id: true },
+    });
+    if (!review) return;
+    await sleep(200);
+  }
+
+  throw new Error(`Timeout: review ${reviewId} не удалён за ${timeoutMs}ms (ожидали FAILED → delete)`);
+}
+
 /** Ждёт пока Generation достигнет целевого статуса (поллинг БД). */
 export async function waitForGenerationStatus(
   app: INestApplication,
@@ -42,9 +66,6 @@ export async function waitForGenerationStatus(
       select: { status: true },
     });
     if (gen?.status === targetStatus) return;
-    if (gen?.status === 'FAILED' && targetStatus !== 'FAILED') {
-      throw new Error(`Generation ${generationId} упала со статусом FAILED, ожидали ${targetStatus}`);
-    }
     await sleep(200);
   }
 
@@ -53,7 +74,10 @@ export async function waitForGenerationStatus(
   );
 }
 
-/** Ждёт одного из двух финальных статусов. */
+/**
+ * Ждёт финального исхода: DONE — статус в БД; FAILED — запись удалена
+ * воркером (ADR-042), возвращается строка 'FAILED'.
+ */
 export async function waitForGenerationDoneOrFailed(
   app: INestApplication,
   generationId: string,
@@ -67,7 +91,8 @@ export async function waitForGenerationDoneOrFailed(
       where: { id: generationId },
       select: { status: true },
     });
-    if (gen?.status === 'DONE' || gen?.status === 'FAILED') return gen.status;
+    if (!gen) return 'FAILED'; // удалена при FAILED (ADR-042)
+    if (gen.status === 'DONE') return gen.status;
     await sleep(200);
   }
 

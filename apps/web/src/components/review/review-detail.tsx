@@ -10,8 +10,9 @@ import { ResultCards } from '../generation/result-cards';
 
 /**
  * /app/reviews/[id] — просмотр сохранённого пакета (те же 4 карточки).
- * Для незавершённой или упавшей генерации переиспользуется пайплайн
- * с SSE-подпиской и кнопкой «Повторить генерацию».
+ * Для незавершённой генерации переиспользуется пайплайн с SSE-подпиской.
+ * При FAILED отзыв удаляется на сервере (ADR-042) — рефетч даёт 404
+ * и показывается сообщение об ошибке.
  */
 export function ReviewDetail({ reviewId }: { reviewId: string }) {
   const queryClient = useQueryClient();
@@ -68,6 +69,10 @@ export function ReviewDetail({ reviewId }: { reviewId: string }) {
         reviewText={review.rawText}
         onDone={(p) => {
           setLivePayload(p);
+          void queryClient.invalidateQueries({ queryKey: ['reviews', reviewId] });
+        }}
+        onFailed={() => {
+          // ADR-042: отзыв удалён на сервере — рефетч вернёт 404 → isError
           void queryClient.invalidateQueries({ queryKey: ['reviews', reviewId] });
         }}
       />

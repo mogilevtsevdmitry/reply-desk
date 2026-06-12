@@ -15,6 +15,7 @@ import {
   cleanDatabase,
   waitForGenerationDoneOrFailed,
   waitForGenerationStatus,
+  waitForReviewDeleted,
 } from './helpers/db-helpers';
 
 describe('Пайплайн генерации — интеграционные тесты', () => {
@@ -83,28 +84,31 @@ describe('Пайплайн генерации — интеграционные �
     expect(review!.severity).not.toBeNull();
   });
 
-  it('невалидный JSON от LLM → один ретрай → FAILED + error (маркер [[FAKE:INVALID]])', async () => {
+  it('невалидный JSON от LLM → SSE FAILED с понятной ошибкой, Review/Generation удалены (ADR-042, [[FAKE:INVALID]])', async () => {
     const user = await registerAndOnboard(app);
 
-    const { generationId } = await createReview(
+    const { reviewId, generationId } = await createReview(
       app,
       user.companyToken,
       'Проблема с записью [[FAKE:INVALID]]',
     );
 
-    await waitForGenerationStatus(app, generationId, 'FAILED');
+    // Финальное событие публикуется ДО удаления — подписчик его получает
+    const events = await collectSseEvents(app, generationId, user.companyToken, 30_000);
+    const finalEvent = events[events.length - 1];
+    expect(finalEvent?.['status']).toBe('FAILED');
+    expect(finalEvent?.['error']).toContain('некорректный результат');
 
+    // FAILED не сохраняется: Review удалён, Generation удалена каскадом
+    await waitForReviewDeleted(app, reviewId);
     const gen = await prisma.generation.findUnique({ where: { id: generationId } });
-    expect(gen!.status).toBe('FAILED');
-    expect(gen!.error).not.toBeNull();
-    // Сообщение указывает на некорректный результат LLM
-    expect(gen!.error).toContain('некорректный результат');
+    expect(gen).toBeNull();
   });
 
-  it('таймаут LLM → FAILED, SSE отдаёт финальное событие', async () => {
+  it('таймаут LLM → SSE отдаёт финальное FAILED, отзыв удалён', async () => {
     const user = await registerAndOnboard(app);
 
-    const { generationId } = await createReview(
+    const { reviewId, generationId } = await createReview(
       app,
       user.companyToken,
       'Долго ждали мастера [[FAKE:TIMEOUT]]',
@@ -115,12 +119,10 @@ describe('Пайплайн генерации — интеграционные �
 
     const finalEvent = events[events.length - 1];
     expect(finalEvent?.['status']).toBe('FAILED');
-    expect(finalEvent?.['error']).toBeDefined();
+    expect(finalEvent?.['error']).toContain('вовремя');
 
-    // Проверяем Generation в БД
-    const gen = await prisma.generation.findUnique({ where: { id: generationId } });
-    expect(gen!.status).toBe('FAILED');
-    expect(gen!.error).toContain('вовремя');
+    // Запись не сохраняется (ADR-042)
+    await waitForReviewDeleted(app, reviewId);
   });
 
   // -------------------------------------------------------------------------

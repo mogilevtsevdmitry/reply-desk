@@ -8,7 +8,7 @@ import {
 } from '@replydesk/contracts';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { NAV_REPEAT_EVENT } from '../layout/app-shell';
 import { isApiError } from '@/lib/api/client';
 import { createReview } from '@/lib/api/endpoints';
@@ -55,6 +55,17 @@ export function GeneratePage() {
   const [authorName, setAuthorName] = useState('');
   const [textError, setTextError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // ADR-042: после FAILED отзыв на сервере удалён, лимит компенсирован —
+  // возвращаемся к форме с заполненными полями и предлагаем повторить
+  const [failed, setFailed] = useState(false);
+  const retryRef = useRef<HTMLDivElement>(null);
+
+  // Фокус переводится на кнопку «Повторить генерацию» программно (MOTION.md)
+  useEffect(() => {
+    if (failed && screen.kind === 'form') {
+      retryRef.current?.querySelector('button')?.focus();
+    }
+  }, [failed, screen.kind]);
 
   const usage = company?.usage;
   const remaining = usage ? Math.max(0, usage.limit - usage.used) : null;
@@ -68,14 +79,14 @@ export function GeneratePage() {
         setRating(null);
         setAuthorName('');
         setTextError(null);
+        setFailed(false);
       }
     };
     window.addEventListener(NAV_REPEAT_EVENT, onRepeat);
     return () => window.removeEventListener(NAV_REPEAT_EVENT, onRepeat);
   }, []);
 
-  const handleSubmit = async (e: FormEvent): Promise<void> => {
-    e.preventDefault();
+  const submit = async (): Promise<void> => {
     const trimmed = text.trim();
     if (!trimmed) {
       setTextError(copy.errorReviewEmpty);
@@ -86,6 +97,7 @@ export function GeneratePage() {
       return;
     }
     setTextError(null);
+    setFailed(false);
     setPending(true);
     const author = authorName.trim();
     try {
@@ -120,12 +132,23 @@ export function GeneratePage() {
     }
   };
 
+  const handleSubmit = (e: FormEvent): void => {
+    e.preventDefault();
+    void submit();
+  };
+
   if (screen.kind === 'pipeline') {
     return (
       <GenerationRun
         reviewId={screen.run.reviewId}
         generationId={screen.run.generationId}
         reviewText={screen.reviewText}
+        onFailed={() => {
+          // ADR-042: отзыв удалён на сервере, лимит компенсирован — назад к форме,
+          // поля сохранены в состоянии страницы, текст можно поправить и повторить
+          setFailed(true);
+          setScreen({ kind: 'form' });
+        }}
         onDone={(payload) => {
           const createdAt = new Date().toISOString();
           setScreen({
@@ -165,9 +188,28 @@ export function GeneratePage() {
       </h1>
       <p className="m-0 mb-8 text-14 text-ink-muted">{copy.genSub}</p>
 
+      {failed ? (
+        <div
+          ref={retryRef}
+          role="alert"
+          className="pl-error-enter mb-6 rounded-lg border border-line bg-surface p-5 text-center shadow-2"
+        >
+          <p className="m-0 mb-2 font-semibold text-ink">{copy.failedTitle}</p>
+          <p className="m-0 mb-4 text-14 text-ink-muted">{copy.failedText}</p>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={pending || remaining === 0}
+            onClick={() => void submit()}
+          >
+            {copy.failedRetry}
+          </Button>
+        </div>
+      ) : null}
+
       <form
         className="rounded-lg border border-line bg-surface p-6 shadow-2"
-        onSubmit={(e) => void handleSubmit(e)}
+        onSubmit={handleSubmit}
         noValidate
       >
         <div className="mb-4 flex flex-col gap-1">

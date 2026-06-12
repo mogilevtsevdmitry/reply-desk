@@ -44,8 +44,10 @@ interface SimilarRow {
 /**
  * Пайплайн генерации (docs/02-DEVELOPER.md, раздел 3): ANALYZING → pg_trgm-поиск
  * похожих → GENERATING → сборка промпта → один generateStructured → валидация
- * similarReviewIds → DONE. Ошибка → FAILED + error + компенсация лимита (ADR-002).
- * Каждый переход статуса публикуется в Redis pub/sub канал gen:{id}.
+ * similarReviewIds → DONE. Ошибка → компенсация лимита (ADR-002) → финальное
+ * SSE-событие FAILED → удаление Review (ADR-042: упавшая генерация не сохраняется;
+ * cascade удаляет Generation). Каждый переход статуса публикуется в Redis pub/sub
+ * канал gen:{id}.
  */
 @Injectable()
 export class GenerationPipelineService {
@@ -141,18 +143,23 @@ export class GenerationPipelineService {
       this.logger.error(
         `Генерация ${generation.id}: FAILED — ${e instanceof Error ? e.message : String(e)}`,
       );
-      await this.prisma.generation.update({
-        where: { id: generation.id },
-        data: { status: 'FAILED', error: message },
-      });
-      // Компенсация резерва (ADR-002, ADR-037) — в период и источник из job
+      // 1. Компенсация резерва (ADR-002, ADR-037) — в период и источник из job
       // (PLAN — счётчик лимита, PACKAGE — пакетные кредиты).
       await this.usage.compensate(job.companyId, job.period, job.usageSource ?? 'PLAN');
+      // 2. Финальное SSE-событие — строго ДО удаления: подписчики получают его
+      // из pub/sub, пока запись ещё существует.
       await this.publish(generation.id, { status: 'FAILED', error: message });
+      // 3. ADR-042: упавшая генерация не сохраняется — Review удаляется
+      // (cascade удаляет Generation). deleteMany — идемпотентно, без падения job.
+      await this.prisma.review.deleteMany({ where: { id: review.id } });
     }
   }
 
-  /** pg_trgm-поиск похожих: строго параметризованный запрос, только свой тенант (ADR-001). */
+  /**
+   * pg_trgm-поиск похожих: строго параметризованный запрос, только свой тенант (ADR-001).
+   * Кандидаты — только отзывы с успешной генерацией (EXISTS status='DONE', ADR-042):
+   * страховка от строк в полёте (PENDING/ANALYZING/GENERATING).
+   */
   private async findSimilar(
     companyId: string,
     reviewId: string,
@@ -162,10 +169,14 @@ export class GenerationPipelineService {
     const rows = await this.prisma.$queryRaw<SimilarRow[]>`
       SELECT id, "rawText", category::text AS category, "createdAt",
              similarity("rawText", ${rawText}) AS sim
-      FROM "Review"
+      FROM "Review" r
       WHERE "companyId" = ${companyId}
         AND id != ${reviewId}
         AND similarity("rawText", ${rawText}) > ${threshold}
+        AND EXISTS (
+          SELECT 1 FROM "Generation" g
+          WHERE g."reviewId" = r.id AND g.status = 'DONE'
+        )
       ORDER BY sim DESC
       LIMIT 5
     `;

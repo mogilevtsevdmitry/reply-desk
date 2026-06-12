@@ -9,7 +9,6 @@ import {
   ListReviewsQuery,
   ListReviewsResponse,
   PublicRepliesSchema,
-  RetryReviewResponse,
   ReviewWithGeneration,
   WinbackSchema,
 } from '@replydesk/contracts';
@@ -66,46 +65,6 @@ export class ReviewsService {
       usageSource: result.usageSource,
     });
     return { reviewId: result.reviewId, generationId: result.generationId };
-  }
-
-  /**
-   * POST /reviews/:id/retry (ADR-003): только из FAILED (иначе 409),
-   * заново резервирует лимит (402 при исчерпании), статус → PENDING, job в очередь.
-   */
-  async retry(companyId: string, reviewId: string): Promise<RetryReviewResponse> {
-    const period = this.usage.currentPeriod();
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      const review = await tx.review.findFirst({
-        where: { id: reviewId, companyId },
-        include: { generation: true, company: true },
-      });
-      if (!review || !review.generation) {
-        throw new AppException('NOT_FOUND', 'Отзыв не найден', 404);
-      }
-      if (review.generation.status !== 'FAILED') {
-        throw new AppException(
-          'CONFLICT',
-          'Повторить можно только неудавшуюся генерацию',
-          409,
-        );
-      }
-      const usageSource = await this.usage.reserve(tx, companyId, review.company.plan, period);
-      await tx.generation.update({
-        where: { id: review.generation.id },
-        data: { status: 'PENDING', error: null },
-      });
-      return { generationId: review.generation.id, usageSource };
-    });
-
-    await this.queue.enqueue({
-      generationId: result.generationId,
-      reviewId,
-      companyId,
-      period,
-      usageSource: result.usageSource,
-    });
-    return { generationId: result.generationId };
   }
 
   /** GET /reviews: фильтры source/category/severity/from/to + пагинация page/pageSize. */

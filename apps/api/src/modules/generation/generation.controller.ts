@@ -17,6 +17,10 @@ import { genChannel, isFinalStatus } from './generation.events';
 /** Keep-alive комментарии SSE (ТЗ: каждые 15с). */
 const KEEP_ALIVE_MS = 15_000;
 
+/** Generic-текст для реконнекта к уже удалённой FAILED-генерации (ADR-042). */
+const GENERIC_GENERATION_ERROR =
+  'Внутренняя ошибка генерации. Попробуйте повторить генерацию.';
+
 /**
  * SSE-поток статусов генерации (ADR-004: аутентификация — Authorization-заголовок,
  * глобальный JwtAuthGuard; токен в query запрещён).
@@ -85,9 +89,14 @@ export class GenerationController {
     });
 
     // 2. Немедленная отдача текущего статуса из БД (включая финальный, если уже готов).
+    // ADR-042: упавшая генерация удаляется воркером после публикации FAILED.
+    // Если запись исчезла между проверкой тенанта и чтением статуса (реконнект
+    // после удаления) — отдаём финальное FAILED с generic-текстом, поток закрывается.
     const generation = await this.prisma.generation.findUnique({ where: { id } });
     if (generation) {
       send(this.toEvent(generation));
+    } else {
+      send({ status: 'FAILED', error: GENERIC_GENERATION_ERROR });
     }
   }
 

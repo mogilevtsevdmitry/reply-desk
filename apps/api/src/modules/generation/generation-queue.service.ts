@@ -39,7 +39,7 @@ export class GenerationQueueService implements OnApplicationShutdown {
 
   async enqueue(data: GenerationJobData): Promise<void> {
     await this.queue.add(GENERATION_JOB_NAME, data, {
-      attempts: 1, // ретраи — только явные, через POST /reviews/:id/retry (ADR-003)
+      attempts: 1, // авторетраев нет: FAILED не сохраняется, повтор — новый POST /reviews (ADR-042)
       removeOnComplete: true,
       removeOnFail: true,
     });

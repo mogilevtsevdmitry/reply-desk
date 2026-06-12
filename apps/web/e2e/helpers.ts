@@ -133,8 +133,9 @@ export async function waitForGenerationDone(
 }
 
 /**
- * Дождаться DONE/FAILED через периодические запросы GET /reviews/:id.
- * FakeLlmProvider быстрый — обычно < 2s.
+ * Дождаться DONE через периодические запросы GET /reviews/:id.
+ * FakeLlmProvider быстрый — обычно < 2s. 404 означает FAILED:
+ * упавшая генерация удаляется на сервере (ADR-042).
  */
 export async function pollReviewStatus(
   accessToken: string,
@@ -147,11 +148,11 @@ export async function pollReviewStatus(
     const res = await fetch(`${API_URL}/reviews/${reviewId}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
+    if (res.status === 404) return 'FAILED'; // отзыв удалён при FAILED (ADR-042)
     if (!res.ok) continue;
     const data = (await res.json()) as { generation?: { status: string } };
     const st = data.generation?.status;
     if (st === 'DONE') return 'DONE';
-    if (st === 'FAILED') return 'FAILED';
   }
   return 'TIMEOUT';
 }

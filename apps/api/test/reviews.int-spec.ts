@@ -15,6 +15,7 @@ import {
   getUsageCounter,
   waitForGenerationDoneOrFailed,
   waitForGenerationStatus,
+  waitForReviewDeleted,
 } from './helpers/db-helpers';
 
 describe('Reviews — интеграционные тесты', () => {
@@ -140,8 +141,9 @@ describe('Reviews — интеграционные тесты', () => {
     expect((overflow.body as { code: string }).code).toBe('LIMIT_EXCEEDED');
   }, 60_000);
 
-  it('FAILED-генерация возвращает лимит (UsageCounter до/после с [[FAKE:NETWORK]])', async () => {
+  it('FAILED → отзыв удалён из БД, UsageCounter компенсирован (ADR-042, [[FAKE:NETWORK]])', async () => {
     const user = await registerAndOnboard(app);
+    const prisma = app.get(PrismaService);
 
     // Получаем текущий период
     const now = new Date();
@@ -149,8 +151,9 @@ describe('Reviews — интеграционные тесты', () => {
 
     const usedBefore = await getUsageCounter(app, user.companyId, period);
 
-    // Создаём отзыв с маркером NETWORK → воркер кинет LlmNetworkError → FAILED → компенсация
-    const { generationId } = await createReview(
+    // Создаём отзыв с маркером NETWORK → воркер кинет LlmNetworkError →
+    // компенсация → SSE FAILED → удаление Review (cascade удаляет Generation)
+    const { reviewId, generationId } = await createReview(
       app,
       user.companyToken,
       'Плохое обслуживание [[FAKE:NETWORK]]',
@@ -160,12 +163,22 @@ describe('Reviews — интеграционные тесты', () => {
     const usedAfterPost = await getUsageCounter(app, user.companyId, period);
     expect(usedAfterPost).toBe(usedBefore + 1);
 
-    // Ждём FAILED
-    await waitForGenerationStatus(app, generationId, 'FAILED');
+    // Ждём удаления отзыва воркером
+    await waitForReviewDeleted(app, reviewId);
 
-    // После FAILED лимит компенсирован (вернулся к начальному)
+    // Generation удалена каскадом
+    const gen = await prisma.generation.findUnique({ where: { id: generationId } });
+    expect(gen).toBeNull();
+
+    // Лимит компенсирован (вернулся к начальному)
     const usedAfterFailed = await getUsageCounter(app, user.companyId, period);
     expect(usedAfterFailed).toBe(usedBefore);
+
+    // GET /reviews/:id → 404, в истории отзыва нет
+    await request(app.getHttpServer())
+      .get(`/api/v1/reviews/${reviewId}`)
+      .set('Authorization', `Bearer ${user.companyToken}`)
+      .expect(404);
   });
 
   // -------------------------------------------------------------------------
@@ -201,47 +214,60 @@ describe('Reviews — интеграционные тесты', () => {
   }, 60_000);
 
   // -------------------------------------------------------------------------
-  // Ретрай
+  // Повтор после FAILED (ADR-042: ретрай-эндпоинта нет, повтор — новый POST)
   // -------------------------------------------------------------------------
 
-  it('retry: POST /reviews/:id/retry для FAILED → 202, новая генерация', async () => {
+  it('эндпоинт POST /reviews/:id/retry удалён → 404 (ADR-042 отменил ADR-003)', async () => {
     const user = await registerAndOnboard(app);
 
-    const { reviewId, generationId } = await createReview(
-      app,
-      user.companyToken,
-      'Не понравилось обслуживание [[FAKE:NETWORK]]',
-    );
-
-    await waitForGenerationStatus(app, generationId, 'FAILED');
-
-    const retryRes = await request(app.getHttpServer())
-      .post(`/api/v1/reviews/${reviewId}/retry`)
-      .set('Authorization', `Bearer ${user.companyToken}`)
-      .expect(202);
-
-    const body = retryRes.body as { generationId: string };
-    expect(body.generationId).toBeDefined();
-  });
-
-  it('retry: не-FAILED статус → 409 CONFLICT', async () => {
-    const user = await registerAndOnboard(app);
-
-    const { reviewId, generationId } = await createReview(
+    const { reviewId } = await createReview(
       app,
       user.companyToken,
       'Хороший сервис, всё понравилось.',
     );
 
-    // Ждём DONE
-    await waitForGenerationStatus(app, generationId, 'DONE');
-
-    const res = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .post(`/api/v1/reviews/${reviewId}/retry`)
       .set('Authorization', `Bearer ${user.companyToken}`)
-      .expect(409);
+      .expect(404);
+  });
 
-    expect((res.body as { code: string }).code).toBe('CONFLICT');
+  it('повторная отправка того же текста после FAILED не находит удалённый отзыв в trgm-кандидатах', async () => {
+    const user = await registerAndOnboard(app);
+    const prisma = app.get(PrismaService);
+
+    const baseText =
+      'Запись потерялась, администратор нагрубил, ждали мастера сорок минут впустую.';
+
+    // 1. Первая попытка падает: маркер сетевой ошибки → FAILED → Review удалён
+    const failedAttempt = await createReview(
+      app,
+      user.companyToken,
+      `${baseText} [[FAKE:NETWORK]]`,
+    );
+    await waitForReviewDeleted(app, failedAttempt.reviewId);
+
+    // 2. Повтор того же текста (без маркера) → DONE
+    const retryAttempt = await createReview(app, user.companyToken, baseText);
+    await waitForGenerationStatus(app, retryAttempt.generationId, 'DONE');
+
+    // Упавшая попытка не попала в похожие: её нет в БД, similarReviewIds пуст
+    const gen = await prisma.generation.findUnique({
+      where: { id: retryAttempt.generationId },
+    });
+    const classification = gen!.classification as {
+      isRepeat: boolean;
+      similarReviewIds: string[];
+    };
+    expect(classification.similarReviewIds).not.toContain(failedAttempt.reviewId);
+    expect(classification.similarReviewIds).toHaveLength(0);
+
+    // В истории ровно один отзыв — успешный
+    const list = await request(app.getHttpServer())
+      .get('/api/v1/reviews')
+      .set('Authorization', `Bearer ${user.companyToken}`)
+      .expect(200);
+    expect((list.body as { total: number }).total).toBe(1);
   });
 
   // -------------------------------------------------------------------------

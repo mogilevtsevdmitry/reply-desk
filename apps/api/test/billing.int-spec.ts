@@ -408,6 +408,9 @@ describe('Биллинг ЮKassa (интеграция)', () => {
   });
 
   it('cancel: FAILED-генерация не считается использованием → полный возврат', async () => {
+    // ADR-042: воркер больше не сохраняет FAILED-строки, так что в живой системе
+    // их нет; фильтр status != FAILED в countUsedGenerationsSince — страховка.
+    // Сеем FAILED напрямую в БД, чтобы закрепить поведение фильтра.
     const user = await registerAndOnboard(app);
     await paySubscription(user, 'START', 1);
 

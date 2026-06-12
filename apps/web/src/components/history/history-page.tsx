@@ -203,13 +203,12 @@ function FilterControl({
 }
 
 function HistoryRow({ item }: { item: ReviewWithGeneration }) {
-  const failed = item.generation?.status === 'FAILED';
+  // FAILED-строк в истории нет по построению (ADR-042: упавшая генерация удаляется);
+  // возможные статусы — PENDING/ANALYZING/GENERATING/DONE.
   return (
     <Link
       href={`/app/reviews/${item.id}`}
-      className={`grid grid-cols-1 items-center gap-2 rounded-lg border bg-surface px-5 py-4 transition-colors duration-[120ms] hover:bg-surface-2 min-[881px]:grid-cols-[auto_1fr_auto] min-[881px]:gap-4 ${
-        failed ? 'border-dashed border-line' : 'border-line hover:border-line-strong'
-      }`}
+      className="grid grid-cols-1 items-center gap-2 rounded-lg border border-line bg-surface px-5 py-4 transition-colors duration-[120ms] hover:border-line-strong hover:bg-surface-2 min-[881px]:grid-cols-[auto_1fr_auto] min-[881px]:gap-4"
     >
       <SevComb level={item.severity ?? 0} />
       <div className="min-w-0">
@@ -218,9 +217,7 @@ function HistoryRow({ item }: { item: ReviewWithGeneration }) {
             <i className={`h-2 w-2 rounded-full ${sourceDotClass[item.source]}`} aria-hidden="true" />
             {sourceLabels[item.source]}
           </span>
-          {failed ? (
-            <span className="font-medium text-sev-4">{copy.historyRowFailed}</span>
-          ) : item.category ? (
+          {item.category ? (
             <span className="before:mr-2 before:text-ink-faint before:content-['·']">
               {categoryLabels[item.category]}
             </span>
