@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { copy, legalEdition } from '@/lib/copy';
 import { LEGAL_SLUGS, readLegalDoc } from '@/lib/legal';
 
@@ -44,7 +45,7 @@ export default async function LegalDocPage({ params }: Props) {
         <p className="m-0 text-13 text-ink-faint">{legalEdition(doc.version, doc.updated)}</p>
       </header>
       <article className="legal-prose">
-        <ReactMarkdown>{doc.body}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{doc.body}</ReactMarkdown>
       </article>
     </main>
   );
