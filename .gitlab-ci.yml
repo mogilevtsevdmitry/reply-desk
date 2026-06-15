@@ -1,0 +1,55 @@
+# =============================================================================
+# ReplyDesk — GitLab CI для реестра делео (gitlab.xn--d1acaxq.xn--p1ai:5050).
+# Собирает 3 образа из docker/*.Dockerfile и пушит под тегом = короткий SHA.
+# Модель сборки — как у habby/castly (docker:dind).
+#
+# ВНИМАНИЕ: стадия `bump` (автокоммит image.*.tag в инфра-репо) УБРАНА —
+# она требовала INFRA_PUSH_TOKEN, которого в проекте нет. Тег-бамп в
+# k8s/prod/reply-desk/values.yaml выполняется ВРУЧНУЮ после успешной сборки.
+#
+# Образы (см. HANDOFF.md):
+#   api      — docker/api.Dockerfile  target runner   (и для worker через override CMD)
+#   migrate  — docker/api.Dockerfile  target migrate  (prisma migrate deploy)
+#   web      — docker/web.Dockerfile  target runner   (build-arg NEXT_PUBLIC_API_URL!)
+#
+# Переменные предоставляет GitLab автоматически:
+#   CI_REGISTRY, CI_REGISTRY_USER, CI_REGISTRY_PASSWORD, CI_REGISTRY_IMAGE,
+#   CI_COMMIT_SHORT_SHA.
+# Для проекта webmogilevtsev/reply-desk:
+#   CI_REGISTRY_IMAGE = gitlab.xn--d1acaxq.xn--p1ai:5050/webmogilevtsev/reply-desk
+#   → образы /api, /migrate, /web.
+# =============================================================================
+
+stages: [build]
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  # ПУБЛИЧНЫЙ URL API — ВШИВАЕТСЯ в web на этапе `next build` (BUG-003).
+  # При смене домена API образ web ПЕРЕСОБИРАЕТСЯ.
+  NEXT_PUBLIC_API_URL: "https://reply-desk.xn--d1acaxq.xn--p1ai/api/v1"
+
+build:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  before_script:
+    - until docker info >/dev/null 2>&1; do sleep 1; done
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    - TAG="${CI_COMMIT_SHORT_SHA}"
+    - REG="${CI_REGISTRY_IMAGE}"        # = gitlab.xn--d1acaxq.xn--p1ai:5050/webmogilevtsev/reply-desk
+    # --- api (target runner): используется api И worker ---
+    - docker build -f docker/api.Dockerfile --target runner  -t "$REG/api:$TAG"     .
+    # --- migrate (target migrate): prisma migrate deploy ---
+    - docker build -f docker/api.Dockerfile --target migrate -t "$REG/migrate:$TAG" .
+    # --- web (target runner): NEXT_PUBLIC_API_URL обязателен ---
+    - docker build -f docker/web.Dockerfile --target runner  -t "$REG/web:$TAG"
+        --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" .
+    - docker push "$REG/api:$TAG"
+    - docker push "$REG/migrate:$TAG"
+    - docker push "$REG/web:$TAG"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
