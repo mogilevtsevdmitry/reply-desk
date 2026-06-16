@@ -25,17 +25,23 @@ stages: [build]
 variables:
   DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: "/certs"
+  # ОБЯЗАТЕЛЬНО для kubernetes-executor + dind-сервиса: без DOCKER_HOST docker CLI
+  # стучится в локальный сокет (которого нет) и `docker info` висит до таймаута.
+  # Значения — из рабочего pipelines/base.yaml инфра-репо.
+  DOCKER_HOST: tcp://docker:2376
+  DOCKER_TLS_VERIFY: 1
+  DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
   # ПУБЛИЧНЫЙ URL API — ВШИВАЕТСЯ в web на этапе `next build` (BUG-003).
   # При смене домена API образ web ПЕРЕСОБИРАЕТСЯ.
   NEXT_PUBLIC_API_URL: "https://reply-desk.xn--d1acaxq.xn--p1ai/api/v1"
 
 build:
   stage: build
-  image: docker:27
+  image: docker:24
   services:
-    - docker:27-dind
+    - docker:24-dind
   before_script:
-    - until docker info >/dev/null 2>&1; do sleep 1; done
+    - until docker info; do sleep 1; done
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
   script:
     - TAG="${CI_COMMIT_SHORT_SHA}"
