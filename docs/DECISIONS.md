@@ -820,3 +820,29 @@ pino-лог уровнем info с пометкой `[mail:dev]` (локалка
 **Последствия.** Для боевой отправки достаточно заполнить SMTP_* у любого
 провайдера (Яндекс 360, UniSender, Mailgun…). Если объём писем вырастет —
 вынести отправку в BullMQ-очередь с ретраями отдельным ADR.
+
+## ADR-045: Egress LLM-трафика через нидерландский форвард-прокси — глобальный диспетчер undici (2026-06-18)
+
+**Контекст.** Прод в РФ (k3s-нода делео), Anthropic API geo-блокирует РФ.
+Исходящие к `api.anthropic.com` нужно завернуть через зарубежный egress, не
+трогая RU-сервисы (ЮKassa, SMTP). Дополнительно вскрылся баг: `@anthropic-ai/sdk`
+v0.104 работает поверх нативного fetch Node 22 (undici), а тот НЕ читает
+`HTTP(S)_PROXY`/`NO_PROXY` из env — выставленные в деплое прокси-переменные молча
+игнорировались, запросы шли напрямую с РФ-ноды.
+
+**Решение.** Forward-proxy chain (CONNECT, ключ шифруется end-to-end):
+reply-desk → in-cluster tinyproxy (egress-proxy) → `upstream http <NL>:38088
+"api.anthropic.com"` → нидерландский tinyproxy (185.171.80.52) → Anthropic. На
+NL только `api.anthropic.com` (Filter allowlist), доступ к прокси заперт
+firewall+ACL на IP РФ-ноды. На стороне приложения `EnvHttpProxyAgent` ставится
+глобальным диспетчером undici первым side-effect-импортом в main.ts И worker.ts
+(воркер — отдельный прод-процесс, именно он зовёт Anthropic). `undici` добавлен
+прямой прод-зависимостью (был только транзитивным dev, срезался `pnpm deploy
+--prod`). NO_PROXY: undici матчит суффиксы хостов, не CIDR — in-cluster покрыт
+`.svc`/`.cluster.local`; postgres/redis на raw TCP диспетчер не затрагивает.
+
+**Последствия.** Anthropic видит голландский IP. egress-proxy шарёный
+(habby/castly/sova/geneo) — upstream заворачивает их Anthropic-трафик тоже
+(желаемо: тот же geo-блок). Если NL-IP сменится/проксей станет несколько —
+вынести в выделенный прокси под reply-desk. Модель `claude-sonnet-4-5` (легаси)
+не трогали — обновление до claude-opus-4-8/sonnet-4-6 отдельной задачей.

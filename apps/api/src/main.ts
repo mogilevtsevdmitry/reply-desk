@@ -1,3 +1,6 @@
+// ВАЖНО: первым импортом — side-effect ставит EnvHttpProxyAgent глобальным
+// диспетчером undici при наличии HTTP(S)_PROXY, до любого исходящего fetch (ADR-045).
+import './config/proxy-bootstrap';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';

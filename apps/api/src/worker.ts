@@ -1,3 +1,7 @@
+// ВАЖНО: первым импортом — side-effect ставит EnvHttpProxyAgent глобальным
+// диспетчером undici при наличии HTTP(S)_PROXY, до любого исходящего fetch (ADR-045).
+// Воркер в проде — отдельный процесс (dist/worker.js) и именно он зовёт Anthropic.
+import './config/proxy-bootstrap';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
